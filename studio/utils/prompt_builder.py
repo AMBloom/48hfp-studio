@@ -94,8 +94,16 @@ class PromptBuilder:
             "1. GLOBAL PRODUCTION TEAM STATE & RESOURCES\n"
             "================================================================================\n"
         )
+        location_directive = (
+            "NOTE: The Production Location dictates physical filming boundaries and logistics. "
+            "It DOES NOT dictate the fictional setting of the story unless explicitly required by the Creative Constraints."
+        )
+
         if not profile:
-            return header + "Team Status: [Unconfigured - Use standard indie film crew defaults]"
+            return (
+                header
+                + f"Team Status: [Unconfigured - Use standard indie film crew defaults]\n\n{location_directive}"
+            )
 
         lines = [
             f"Production Team Name: {profile.team_name}",
@@ -112,6 +120,8 @@ class PromptBuilder:
 
         if profile.custom_details and profile.custom_details.strip():
             lines.append(f"Custom Equipment & Logistics Notes:\n  {profile.custom_details.strip()}")
+
+        lines.append(f"\n{location_directive}")
 
         return header + "\n".join(lines)
 

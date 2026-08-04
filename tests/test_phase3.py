@@ -2,6 +2,10 @@
 
 import pytest
 from studio.models.draw import (
+    FALLBACK_LINES,
+    FALLBACK_NAMES,
+    FALLBACK_PROPS,
+    FALLBACK_TRAITS,
     GENRES_GROUP_1,
     GENRES_GROUP_2,
     FridayDraw,
@@ -31,10 +35,25 @@ def test_friday_draw_fallback_generator():
     draw = create_default_draw()
     assert draw.genre_1 in GENRES_GROUP_1
     assert draw.genre_2 in GENRES_GROUP_2
-    assert draw.character_name == "Alex Vance"
-    assert draw.character_trait == "Clockmaker / Obsessive"
-    assert draw.required_prop == "An antique brass pocket watch"
-    assert "five minutes" in draw.required_line
+    assert draw.character_name in FALLBACK_NAMES
+    assert draw.character_trait in FALLBACK_TRAITS
+    assert draw.required_prop in FALLBACK_PROPS
+    assert draw.required_line in FALLBACK_LINES
+
+    draw_empty = create_default_draw(
+        genre_1="",
+        genre_2="  ",
+        character_name="",
+        character_trait="  ",
+        required_prop="",
+        required_line="  ",
+    )
+    assert draw_empty.genre_1 in GENRES_GROUP_1
+    assert draw_empty.genre_2 in GENRES_GROUP_2
+    assert draw_empty.character_name in FALLBACK_NAMES
+    assert draw_empty.character_trait in FALLBACK_TRAITS
+    assert draw_empty.required_prop in FALLBACK_PROPS
+    assert draw_empty.required_line in FALLBACK_LINES
 
 
 def test_draw_store_lifecycle():

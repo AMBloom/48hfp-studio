@@ -51,7 +51,10 @@ def get_next_version_number(outputs_dir: Path) -> int:
     return max(versions) + 1
 
 
-def convert_treatment_to_markdown(treatment: TreatmentOutput) -> str:
+def convert_treatment_to_markdown(
+    treatment: TreatmentOutput,
+    prompt_text: Optional[str] = None,
+) -> str:
     """Convert a TreatmentOutput Pydantic object into a readable Markdown document."""
     tl = treatment.title_and_logline
     syn = treatment.synopsis
@@ -144,12 +147,24 @@ def convert_treatment_to_markdown(treatment: TreatmentOutput) -> str:
         ]
     )
 
+    if prompt_text and prompt_text.strip():
+        lines.extend(
+            [
+                "## 7. APPENDIX: SYSTEM PROMPT",
+                "```",
+                prompt_text.strip(),
+                "```",
+                "",
+            ]
+        )
+
     return "\n".join(lines)
 
 
 def save_treatment_output(
     treatment: TreatmentOutput,
     outputs_dir: Optional[Path] = None,
+    prompt_text: Optional[str] = None,
 ) -> Path:
     """Safely export treatment to Markdown file with auto-incrementing zero-padded version.
 
@@ -190,7 +205,7 @@ def save_treatment_output(
             break
         version += 1
 
-    markdown_content = convert_treatment_to_markdown(treatment)
+    markdown_content = convert_treatment_to_markdown(treatment, prompt_text=prompt_text)
     file_path.write_text(markdown_content, encoding="utf-8")
 
     return file_path

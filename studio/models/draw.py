@@ -41,6 +41,139 @@ GENRES_GROUP_2: List[str] = [
     "Workplace Film",
 ]
 
+FALLBACK_NAMES: List[str] = [
+    "Michael / Michelle",
+    "Colin / Coleen",
+    "Dan / Danielle",
+    "Sam / Samantha",
+    "Alex / Alexa",
+    "Aaron / Erin",
+    "Gabriel / Gabrielle",
+    "Julian / Julianne",
+    "Oliver / Olivia",
+    "Adrian / Adriana",
+    "Paul / Paula",
+    "Chris / Christine",
+    "Victor / Victoria",
+    "Jesse / Jessica",
+    "Martin / Martina",
+    "Simon / Simone",
+    "Eric / Erica",
+    "Brian / Brianna",
+    "Carl / Carla",
+    "Justin / Justine",
+    "Stephen / Stephanie",
+    "Andrew / Andrea",
+    "Christian / Christina",
+    "Leo / Leona",
+    "Gene / Jean",
+]
+
+FALLBACK_TRAITS: List[str] = [
+    "Commuter",
+    "Customer",
+    "Tourist",
+    "Office worker",
+    "Passerby",
+    "Realtor",
+    "Mediator",
+    "Doctor",
+    "First Responder",
+    "Musician",
+    "Driver",
+    "Teacher",
+    "Priest / Clergy",
+    "Engineer",
+    "Decorator",
+    "Curator",
+    "Writer",
+    "Investor / Banker",
+    "Politician",
+    "Zookeeper",
+    "Mechanic",
+    "Locksmith",
+    "Beautician / Stylist",
+    "Athlete",
+    "Hero",
+    "Psychologist",
+    "Chef / Waitstaff / Bartender",
+    "Criminal / Outlaw",
+    "Celebrity",
+    "Salesperson",
+    "Startup Founder",
+    "Delivery Courier",
+    "HOA Treasurer",
+    "Watchmaker",
+    "Dog Walker",
+    "Data Analyst",
+    "Night Watchman",
+    "Podcast Host",
+    "Librarian",
+]
+
+FALLBACK_PROPS: List[str] = [
+    "Mirror",
+    "Tape",
+    "Pliers",
+    "Hat",
+    "Banana",
+    "Pencil",
+    "Trophy",
+    "Umbrella",
+    "Key",
+    "Alarm clock",
+    "Rubber band",
+    "Paper clip",
+    "The number 25",
+    "Soda can",
+    "USB thumb drive",
+    "Coffee mug",
+    "Flashlight",
+    "Deck of cards",
+    "Chess pawn",
+    "Cast iron skillet",
+    "Wristwatch",
+    "Leather jacket",
+    "Dog leash",
+    "Sunglasses",
+    "Receipt",
+    "Coin",
+    "Apple",
+    "Towel",
+    "Backpack",
+    "Headphones",
+]
+
+FALLBACK_LINES: List[str] = [
+    "Look what I did.",
+    "Why do you ask?",
+    "Don't tell anyone.",
+    "Let me know when it's ready.",
+    "Let me know when it is ready.",
+    "There's no 'I' in 'Team'.",
+    "I did not see that coming.",
+    "Can you tell me what just happened?",
+    "I'll take it from here.",
+    "That's how you do it.",
+    "I've got a bad feeling about this.",
+    "I can't believe it.",
+    "I'm ready for anything.",
+    "I'm switching it up.",
+    "This is going way too fast for me.",
+    "Do you understand and accept these risks?",
+    "Your mileage may vary.",
+    "It's not you, it's me.",
+    "It's not me, it's you.",
+    "This explains everything.",
+    "It's a long story.",
+    "Does the Pope shit in the woods?",
+    "Well that didn't pan out.",
+    "That was worth the wait.",
+    "It insists upon itself.",
+    "Have a seat.",
+    "It doesn't look like anything to me.",
+]
+
 
 def current_iso_timestamp() -> str:
     """Return current ISO 8601 formatted timestamp string."""
@@ -84,6 +217,15 @@ class FridayDraw(BaseModel):
             raise ValueError("Genre 2 cannot be empty")
         return clean_val
 
+    @field_validator("required_line")
+    @classmethod
+    def validate_required_line(cls, v: str) -> str:
+        """Strip whitespace and surrounding single or double quotes from required_line."""
+        clean_val = v.strip().strip('"\'').strip()
+        if not clean_val:
+            raise ValueError("Required line cannot be empty")
+        return clean_val
+
 
 def create_default_draw(
     genre_1: Optional[str] = None,
@@ -98,11 +240,11 @@ def create_default_draw(
     g1 = genre_1.strip() if genre_1 and genre_1.strip() else random.choice(GENRES_GROUP_1)
     g2 = genre_2.strip() if genre_2 and genre_2.strip() else random.choice(GENRES_GROUP_2)
 
-    c_name = character_name.strip() if character_name and character_name.strip() else "Alex Vance"
-    c_trait = character_trait.strip() if character_trait and character_trait.strip() else "Clockmaker / Obsessive"
+    c_name = character_name.strip() if character_name and character_name.strip() else random.choice(FALLBACK_NAMES)
+    c_trait = character_trait.strip() if character_trait and character_trait.strip() else random.choice(FALLBACK_TRAITS)
     c_gender = character_gender.strip() if character_gender and character_gender.strip() else "Male or Female"
-    prop = required_prop.strip() if required_prop and required_prop.strip() else "An antique brass pocket watch"
-    line = required_line.strip() if required_line and required_line.strip() else "We only have five minutes before the tide comes in."
+    prop = required_prop.strip() if required_prop and required_prop.strip() else random.choice(FALLBACK_PROPS)
+    line = required_line.strip().strip('"\'').strip() if required_line and required_line.strip() else random.choice(FALLBACK_LINES)
 
     return FridayDraw(
         genre_1=g1,

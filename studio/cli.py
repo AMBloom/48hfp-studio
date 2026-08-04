@@ -19,7 +19,7 @@ from studio.utils.ui import display_prompt_panel, print_banner, print_panel
 app = typer.Typer(
     name="48hfp",
     help="48HFP-Studio: Terminal-native AI co-pilot for short film festival pre-production.",
-    no_args_is_help=True,
+    no_args_is_help=False,
     add_completion=False,
 )
 
@@ -41,8 +41,9 @@ def version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main(
+    ctx: typer.Context,
     version: Optional[bool] = typer.Option(
         None,
         "--version",
@@ -53,7 +54,41 @@ def main(
     ),
 ) -> None:
     """48HFP-Studio CLI root callback."""
-    pass
+    if ctx.invoked_subcommand is not None:
+        return
+
+    print_banner()
+
+    if not profile_exists():
+        print_panel(
+            content=(
+                "You haven't configured your team yet.\n"
+                "👉 Proceed: Run [cyan]python main.py config setup[/cyan] to onboard your team."
+            ),
+            title="🧭 What's Next? (Stage 1: Setup)",
+            border_style="yellow",
+        )
+    elif not draw_exists():
+        print_panel(
+            content=(
+                "Your team is configured, but you haven't recorded your Friday Draw parameters.\n"
+                "👉 Proceed: Run [cyan]python main.py draw wizard[/cyan] to record your constraints.\n"
+                "👉 Go Back: Run [cyan]python main.py config setup[/cyan] to edit your team profile."
+            ),
+            title="🧭 What's Next? (Stage 2: Kickoff Draw)",
+            border_style="yellow",
+        )
+    else:
+        print_panel(
+            content=(
+                "All systems go. Your team profile and kickoff draw are locked in.\n"
+                "👉 Proceed: Run [cyan]python main.py generate[/cyan] to draft your film treatment.\n"
+                "👉 Go Back: Run [cyan]python main.py constraints[/cyan] to manage active sets.\n"
+                "👉 Start Over: Run [cyan]python main.py draw reset[/cyan] to wipe your draw and start fresh."
+            ),
+            title="🧭 What's Next? (Stage 3: Ready for Generation)",
+            border_style="green",
+        )
 
 
 @app.command("prompt")
@@ -107,7 +142,7 @@ def generate_command(
                 model_name=model,
             )
 
-        saved_path = save_treatment_output(treatment, outputs_dir=output_dir)
+        saved_path = save_treatment_output(treatment, outputs_dir=output_dir, prompt_text=prompt_text)
 
         tl = treatment.title_and_logline
         chk = treatment.compliance_checklist
