@@ -1,0 +1,31 @@
+name: interior_indie_crew
+description: Default indoor indie shoot setup with a small crew and kitchen/living
+  room locations.
+locations:
+- Interior
+- Apartment
+- Day/Night
+sub_locations:
+- Living Room
+- Kitchen
+- Hallway
+- Balcony
+location_details: Natural daylight through living room windows. Kitchen equipped with
+  island counter and fluorescent overheads.
+main_character_details:
+  name: Protagonist
+  actor_traits: Late 20s - Early 30s, expressive eyes, casual clothing
+  wardrobe: Faded denim jacket, graphic tee, sneakers
+  notes: Resourceful but anxious under pressure
+other_characters:
+- name: Eclectic Neighbor
+  actor_traits: 40s, eccentric posture, loud voice
+  wardrobe: Bright bathrobe or oversized vintage cardigan
+  notes: Provides unexpected plot exposition
+props_and_dialogue:
+- Vintage coffee mug
+- Flickering table lamp
+- Unopened letter on kitchen counter
+- 'Running Joke: ''Did anyone actually remember the coffee?'''
+created_at: '2026-08-03T16:57:16.151165'
+updated_at: '2026-08-03T16:57:16.151227'
