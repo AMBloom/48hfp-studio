@@ -10,6 +10,7 @@ from studio.config import config_app
 from studio.constraints import constraints_app
 from studio.draw import draw_app
 from studio.inference import InferenceEngine, InferenceError
+from studio.tui import StudioApp
 from studio.utils.draw_store import draw_exists, load_draw
 from studio.utils.profile_store import get_profile_path, load_profile, profile_exists
 from studio.utils.prompt_builder import PromptBuilder
@@ -57,38 +58,8 @@ def main(
     if ctx.invoked_subcommand is not None:
         return
 
-    print_banner()
-
-    if not profile_exists():
-        print_panel(
-            content=(
-                "You haven't configured your team yet.\n"
-                "👉 Proceed: Run [cyan]python main.py config setup[/cyan] to onboard your team."
-            ),
-            title="🧭 What's Next? (Stage 1: Setup)",
-            border_style="yellow",
-        )
-    elif not draw_exists():
-        print_panel(
-            content=(
-                "Your team is configured, but you haven't recorded your Friday Draw parameters.\n"
-                "👉 Proceed: Run [cyan]python main.py draw wizard[/cyan] to record your constraints.\n"
-                "👉 Go Back: Run [cyan]python main.py config setup[/cyan] to edit your team profile."
-            ),
-            title="🧭 What's Next? (Stage 2: Kickoff Draw)",
-            border_style="yellow",
-        )
-    else:
-        print_panel(
-            content=(
-                "All systems go. Your team profile and kickoff draw are locked in.\n"
-                "👉 Proceed: Run [cyan]python main.py generate[/cyan] to draft your film treatment.\n"
-                "👉 Go Back: Run [cyan]python main.py constraints[/cyan] to manage active sets.\n"
-                "👉 Start Over: Run [cyan]python main.py draw reset[/cyan] to wipe your draw and start fresh."
-            ),
-            title="🧭 What's Next? (Stage 3: Ready for Generation)",
-            border_style="green",
-        )
+    tui_app = StudioApp()
+    tui_app.run()
 
 
 @app.command("prompt")

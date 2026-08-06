@@ -1,12 +1,12 @@
-48HFP-Studio: Master Application Bible (v2.0 - CLI Edition)
+48HFP-Studio: Master Application Bible (v2.0 - TUI Edition)
 1. Project Overview & Vision
-48HFP-Studio is an open-source, terminal-native AI co-pilot designed for indie film teams competing in the 48 Hour Film Project or similar short film festivals. The application operates exclusively via a Command Line Interface (CLI), ensuring a lightweight footprint, high-speed operation, and easy distribution via GitHub.
+48HFP-Studio is an open-source, terminal-native AI co-pilot designed for indie film teams competing in the 48 Hour Film Project or similar short film festivals. Transitioned in v2.0 to a stateful Terminal User Interface (TUI) powered by Textual, the application replaces linear CLI prompts with an interactive split-pane dashboard (Header HUD, Left Navigation Sidebar, and Split-Pane Studio Workspace), while maintaining headless CLI subcommands for high-speed scripting and automation.
 
 The software acts as a highly disciplined pre-production engine. By ingesting modular, user-defined "Constraint Sets" alongside the official Friday Night Draw, the app generates deterministic, 100% compliant script treatments. The application enforces immutable festival rules and creative alignment before cameras roll, saving critical hours during a 48-hour sprint.
 2. Environment & Tech Stack
 Target OS: Cross-platform (Developed on Ubuntu 24.04 LTS)
 Runtime: Python 3.11+
-CLI Framework: typer (command routing) & rich (terminal formatting/UI)
+TUI / CLI Framework: textual (stateful TUI dashboard), typer (command routing), & rich (terminal formatting/UI)
 Data Validation: pydantic v2
 Configuration Storage: PyYAML (for human-readable, multi-line string constraint files)
 LLM Orchestration: google-genai SDK (Primary inference engine). Note: Architecture must abstract the provider interface to allow open-source users to easily plug in Ollama, Gemma, or OpenAI endpoints in future builds.
@@ -150,6 +150,30 @@ Sprint 4.2: Output Versioning System
 4.2.1: Build the Markdown export utility to convert the structured LLM response into a highly readable formatting standard.
 
 4.2.2: Implement the safe-write system that exports the markdown document to the /outputs directory using a strict, timestamped naming convention (e.g., treatment_v[XX]_[Logistical]_[Creative]_[Timestamp].md).
+
+Phase 5: Textual TUI Scaffolding & Layout Architecture
+Objective: Scaffold a stateful Terminal User Interface (TUI) using Textual with a split-pane layout and seamless CLI root launch integration.
+
+Sprint 5.4: Textual TUI Scaffolding & CLI Integration
+
+5.4.1: Install textual dependency and set up studio/tui.py with StudioApp class inheriting from textual.app.App.
+
+5.4.2: Implement CSS grid/dock layout featuring Header HUD ("🎬 48HFP-Studio v2.0"), persistent Left Navigation Sidebar, and Main Content Studio Workspace.
+
+5.4.3: Implement stub widgets for Header, Navigation Sidebar, and Studio Workspace.
+
+5.4.4: Intercept root CLI command (`python main.py`) in studio/cli.py to run StudioApp, while preserving subcommand bypass for headless CLI commands.
+
+Phase 6: Stateful Library & Interactive Dashboard
+Objective: Connect the TUI frontend widgets to real-time application state, live profile/draw updates, and in-TUI generation workflows.
+
+Sprint 6.1: Live Widget Binding & Real-Time Profile/Draw Sync
+
+6.1.1: Bind Team Profile and Friday Draw stores to TUI sidebar and workspace widgets for real-time state visualization.
+
+Sprint 6.2: In-TUI Friday Draw Wizard & Treatment Previewer
+
+6.2.1: Implement interactive modal wizards in TUI for configuration setup, Friday Draw entry, constraint set management, and live treatment previewing.
 
 
 Developer Diary

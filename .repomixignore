@@ -1,0 +1,22 @@
+# Repomix Output Files (prevent recursive nesting)
+repomix*.xml
+*.xml
+
+# Python Environment & Build Artifacts
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Environment & Secret Files
+.env
+.env.*
+
+# Git directory
+.git/

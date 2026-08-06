@@ -1,1 +1,18 @@
+# Python Virtual Environments
 .venv/
+venv/
+env/
+
+# Python Caches & Build Outputs
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Environment Files
+.env
+
+# Repomix Outputs
+repomix*.xml
