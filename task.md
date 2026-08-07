@@ -1,16 +1,19 @@
-# Phase 2 Execution Checklist
+# Task Checklist - Sprint 6.2: In-TUI Friday Draw Wizard & Profile Setup Modals
 
-- [x] `[x]` Sprint 2.1: Data Models & Persistence Storage
-  - [x] `[x]` Implement `studio/models/constraints.py` (Pydantic models for Logistical and Creative constraints)
-  - [x] `[x]` Update `studio/models/profile.py` (Add active constraint state tracking fields)
-  - [x] `[x]` Implement `studio/utils/constraint_store.py` (Dynamic path resolution with `Path.cwd() / "constraints"`, YAML load/save/delete/list, and default seeding)
-- [x] `[x]` Sprint 2.2: CLI Constraint Management (CRUD)
-  - [x] `[x]` Update `studio/utils/ui.py` (Rich table and detail card formatting for constraint sets)
-  - [x] `[x]` Implement `studio/constraints.py` (Typer subcommands: list, create, show, edit, delete, set-active, show-active)
-  - [x] `[x]` Update `studio/cli.py` (Register `constraints` subcommand and update `48hfp info`)
-- [x] `[x]` Verification & Testing
-  - [x] `[x]` Run CLI commands for create, list, show, edit, set-active, show-active, delete
-  - [x] `[x]` Confirm YAML files in `./constraints/logistical` and `./constraints/creative`
-- [x] `[x]` Final Deliverables
-  - [x] `[x]` Generate `walkthrough_phase2.md`
-  - [x] `[x]` Run `repomix` to output `repomix-phase2.xml`
+- [x] Component 1: Create `studio/screens.py` modal screens
+  - [x] Implement `DrawWizardScreen` modal form with genre `Select` and `Input` fields
+  - [x] Implement `ProfileSetupScreen` modal form with profile `Input` fields
+  - [x] Add save validation, fallback handling (`create_default_draw`), file storage calls (`save_draw`, `save_profile`), and screen dismissal callbacks
+- [x] Component 2: Integrate modal screens into `studio/tui.py`
+  - [x] Import screens into `studio/tui.py`
+  - [x] Add key bindings (`d` for Draw Wizard, `p` for Profile Setup)
+  - [x] Add physical trigger buttons or action links in `NavigationSidebar` / `StudioWorkspace`
+  - [x] Implement screen push actions (`action_open_draw_wizard`, `action_open_profile_setup`)
+  - [x] Implement callback handlers (`update_draw`, `update_profile`) to update reactive app state
+- [x] Component 3: Build automated tests in `tests/test_phase6_2.py`
+  - [x] Test `DrawWizardScreen` form submission, fallbacks, saving, and cancellation
+  - [x] Test `ProfileSetupScreen` form submission, saving, and cancellation
+  - [x] Test TUI integration, screen pushing, callbacks, and reactive state updates
+- [x] Component 4: Verification & Walkthrough
+  - [x] Run `pytest tests/test_phase6_2.py` and full `pytest` suite (33 passed)
+  - [x] Update `walkthrough.md` with results

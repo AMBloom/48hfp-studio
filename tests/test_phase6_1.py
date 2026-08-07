@@ -5,6 +5,8 @@ import pytest
 from studio.models.profile import TeamProfile
 from studio.models.draw import FridayDraw
 from studio.tui import StudioApp, HeaderHUD, NavigationSidebar, StudioWorkspace
+from studio.workspace import RecipePane
+from textual.widgets import Static
 
 
 @pytest.fixture
@@ -104,17 +106,18 @@ async def test_workspace_dynamic_rendering(sample_draw):
     app = StudioApp()
     async with app.run_test():
         workspace = app.query_one(StudioWorkspace)
+        recipe = workspace.query_one(RecipePane)
+        recipe_static = recipe.query_one("#recipe-content", Static)
+
         workspace.draw = None
         workspace.update_content()
-        assert "NO DRAW RECORDED" in str(workspace.render())
+        assert "NO DRAW RECORDED" in str(recipe_static.render())
 
         workspace.draw = sample_draw
         workspace.update_content()
-        assert "ACTIVE FRIDAY DRAW" in str(workspace.render())
-        assert "Sci Fi" in str(workspace.render())
-        assert "Heist" in str(workspace.render())
-        assert "Sam Taylor" in str(workspace.render())
-        assert "Silver Chronometer" in str(workspace.render())
-        assert "We are out of time." in str(workspace.render())
-
-
+        assert "ACTIVE FRIDAY DRAW" in str(recipe_static.render())
+        assert "Sci Fi" in str(recipe_static.render())
+        assert "Heist" in str(recipe_static.render())
+        assert "Sam Taylor" in str(recipe_static.render())
+        assert "Silver Chronometer" in str(recipe_static.render())
+        assert "We are out of time." in str(recipe_static.render())

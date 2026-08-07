@@ -1,15 +1,25 @@
 """Stateful Terminal User Interface (TUI) for 48HFP-Studio using Textual."""
 
 from typing import Optional
+from textual import work
 from textual.app import App, ComposeResult
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Horizontal
 from textual.reactive import reactive
-from textual.widgets import Header, Footer, Static, Label
+from textual.widgets import Button, Footer, Header, Label, Static
 
-from studio.models.profile import TeamProfile
+from studio.inference import InferenceEngine, InferenceError
 from studio.models.draw import FridayDraw
-from studio.utils.profile_store import load_profile
+from studio.models.profile import TeamProfile
+from studio.screens import DrawWizardScreen, ProfileSetupScreen
+from studio.screens_library import ConstraintLibraryScreen
 from studio.utils.draw_store import load_draw
+from studio.utils.profile_store import load_profile
+from studio.utils.prompt_builder import PromptBuilder
+from studio.utils.treatment_store import (
+    convert_treatment_to_markdown,
+    save_treatment_output,
+)
+from studio.workspace import DEFAULT_WELCOME_MARKDOWN, StudioWorkspace
 
 
 class HeaderHUD(Static):
@@ -55,12 +65,17 @@ class NavigationSidebar(Static):
 
     DEFAULT_CSS = """
     NavigationSidebar {
-        width: 32;
+        width: 34;
         height: 100%;
         background: $surface;
         color: $text;
         border-right: heavy $accent;
         padding: 1 2;
+    }
+
+    NavigationSidebar Button {
+        width: 100%;
+        margin-top: 1;
     }
     """
 
@@ -69,6 +84,11 @@ class NavigationSidebar(Static):
 
     def on_mount(self) -> None:
         self.update_content()
+
+    def compose(self) -> ComposeResult:
+        yield Button("👤 Profile Setup [P]", id="btn_profile_modal", variant="default")
+        yield Button("🎲 Friday Draw [D]", id="btn_draw_modal", variant="primary")
+        yield Button("📚 Constraints [L]", id="btn_library_modal", variant="default")
 
     def update_content(self) -> None:
         if self.profile:
@@ -96,58 +116,9 @@ class NavigationSidebar(Static):
             "• [dim]Team Profile[/dim]\n"
             "• [dim]Friday Draw[/dim]\n"
             "• [dim]Constraints[/dim]\n"
-            "• [dim]Treatment Generator[/dim]"
+            "• [dim]Treatment Generator[/dim]\n"
         )
         self.update(content)
-
-
-class StudioWorkspace(Static):
-    """Main Content Studio Workspace widget."""
-
-    draw: reactive[Optional[FridayDraw]] = reactive(None)
-    profile: reactive[Optional[TeamProfile]] = reactive(None)
-
-    DEFAULT_CSS = """
-    StudioWorkspace {
-        width: 1fr;
-        height: 100%;
-        background: $background;
-        color: $text;
-        padding: 2 4;
-    }
-    """
-
-    def watch_draw(self, draw: Optional[FridayDraw]) -> None:
-        self.update_content()
-
-    def watch_profile(self, profile: Optional[TeamProfile]) -> None:
-        self.update_content()
-
-    def on_mount(self) -> None:
-        self.update_content()
-
-    def update_content(self) -> None:
-        if self.draw:
-            draw_summary = (
-                "🎲 [bold green]ACTIVE FRIDAY DRAW[/bold green]\n"
-                f"• [bold white]Genre 1:[/bold white] [cyan]{self.draw.genre_1}[/cyan]\n"
-                f"• [bold white]Genre 2:[/bold white] [cyan]{self.draw.genre_2}[/cyan]\n"
-                f"• [bold white]Character:[/bold white] [yellow]{self.draw.character_name}[/yellow] "
-                f"([dim]{self.draw.character_trait}, {self.draw.character_gender}[/dim])\n"
-                f"• [bold white]Required Prop:[/bold white] [magenta]{self.draw.required_prop}[/magenta]\n"
-                f"• [bold white]Required Line:[/bold white] [italic green]\"{self.draw.required_line}\"[/italic green]\n"
-            )
-        else:
-            draw_summary = (
-                "🎲 [bold red]NO DRAW RECORDED[/bold red]\n"
-                "[dim]Run `48hfp draw` or perform kickoff in TUI to record draw data.[/dim]\n"
-            )
-
-        header = "🎬 [bold yellow]48HFP-STUDIO WORKSPACE[/bold yellow]\n\n"
-        welcome = "[bold white]Welcome to 48HFP-Studio v2.0 TUI Edition[/bold white]\n\n"
-        footer = "\n[dim]Press Ctrl+C or Q to exit.[/dim]"
-
-        self.update(f"{header}{welcome}{draw_summary}{footer}")
 
 
 class StudioApp(App):
@@ -157,6 +128,8 @@ class StudioApp(App):
 
     app_profile: reactive[Optional[TeamProfile]] = reactive(None)
     app_draw: reactive[Optional[FridayDraw]] = reactive(None)
+    current_markdown: reactive[str] = reactive(DEFAULT_WELCOME_MARKDOWN)
+    is_generating: reactive[bool] = reactive(False)
 
     CSS = """
     Screen {
@@ -172,6 +145,10 @@ class StudioApp(App):
     """
 
     BINDINGS = [
+        ("d", "open_draw_wizard", "Friday Draw"),
+        ("p", "open_profile_setup", "Profile Setup"),
+        ("l", "open_library", "Constraint Library"),
+        ("g", "generate_treatment", "Generate Treatment"),
         ("q", "quit", "Quit"),
         ("ctrl+c", "quit", "Quit"),
     ]
@@ -206,8 +183,106 @@ class StudioApp(App):
         except Exception:
             pass
 
+    def watch_current_markdown(self, markdown_text: str) -> None:
+        """Push current_markdown state down to workspace."""
+        try:
+            self.query_one(StudioWorkspace).markdown_text = markdown_text
+        except Exception:
+            pass
+
+    def watch_is_generating(self, is_generating: bool) -> None:
+        """Push is_generating state down to workspace."""
+        try:
+            self.query_one(StudioWorkspace).is_generating = is_generating
+        except Exception:
+            pass
+
+    def action_open_draw_wizard(self) -> None:
+        """Push the DrawWizardScreen modal."""
+        self.push_screen(DrawWizardScreen(self.app_draw), callback=self.update_draw)
+
+    def action_open_profile_setup(self) -> None:
+        """Push the ProfileSetupScreen modal."""
+        self.push_screen(ProfileSetupScreen(self.app_profile), callback=self.update_profile)
+
+    def action_open_library(self) -> None:
+        """Push the ConstraintLibraryScreen modal."""
+        self.push_screen(ConstraintLibraryScreen(self.app_profile), callback=self.update_profile)
+
+    @work(thread=True)
+    def action_generate_treatment(self) -> None:
+        """Compile system prompt and generate film treatment in background worker thread."""
+        self.call_from_thread(self._set_generating_state, True)
+        try:
+            prompt = PromptBuilder.compile_system_prompt(
+                draw=self.app_draw,
+                profile=self.app_profile,
+            )
+            treatment = InferenceEngine.generate_treatment(prompt=prompt)
+            saved_path = save_treatment_output(treatment, prompt_text=prompt)
+            md_content = convert_treatment_to_markdown(treatment, prompt_text=prompt)
+            header = f"> 💾 **Saved to:** `{saved_path}`\n\n"
+            final_md = header + md_content
+            self.call_from_thread(self._on_treatment_success, final_md, str(saved_path))
+        except InferenceError as err:
+            err_msg = str(err)
+            error_md = (
+                f"# ❌ Generation Failed\n\n"
+                f"> **Inference Error:**\n```\n{err_msg}\n```\n\n"
+                f"Please verify your `GEMINI_API_KEY` environment variable or try again."
+            )
+            self.call_from_thread(self._on_treatment_error, error_md, err_msg)
+        except Exception as err:
+            err_msg = str(err)
+            error_md = (
+                f"# ❌ Unexpected Error\n\n"
+                f"> **Error:**\n```\n{err_msg}\n```"
+            )
+            self.call_from_thread(self._on_treatment_error, error_md, err_msg)
+
+    def _set_generating_state(self, state: bool) -> None:
+        self.is_generating = state
+
+    def _on_treatment_success(self, md_content: str, saved_path: str) -> None:
+        self.current_markdown = md_content
+        self.is_generating = False
+        self.notify(
+            f"Treatment saved to {saved_path}",
+            title="Treatment Generated",
+            severity="information",
+        )
+
+    def _on_treatment_error(self, error_md: str, err_msg: str) -> None:
+        self.current_markdown = error_md
+        self.is_generating = False
+        self.notify(
+            f"Generation failed: {err_msg}",
+            title="Generation Error",
+            severity="error",
+        )
+
+    def update_draw(self, new_draw: Optional[FridayDraw]) -> None:
+        """Callback invoked when DrawWizardScreen is dismissed."""
+        if new_draw is not None:
+            self.app_draw = new_draw
+
+    def update_profile(self, new_profile: Optional[TeamProfile]) -> None:
+        """Callback invoked when ProfileSetupScreen is dismissed."""
+        if new_profile is not None:
+            self.app_profile = new_profile
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button presses from sidebar or workspace."""
+        if event.button.id == "btn_draw_modal":
+            self.action_open_draw_wizard()
+        elif event.button.id == "btn_profile_modal":
+            self.action_open_profile_setup()
+        elif event.button.id == "btn_library_modal":
+            self.action_open_library()
+        elif event.button.id == "btn_generate_treatment":
+            self.action_generate_treatment()
+
 
 if __name__ == "__main__":
     app = StudioApp()
     app.run()
-

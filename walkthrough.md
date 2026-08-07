@@ -1,88 +1,66 @@
-# Walkthrough: Phase 2 - The Unified Constraint System
+# Walkthrough - Sprint 6.4: In-TUI Constraint Library Management (CRUD)
 
-## Overview
-In Phase 2 of **48HFP-Studio**, we implemented the complete modular architecture for managing user-defined **Logistical** and **Creative Constraint Sets**. This provides filmmakers with a hot-swappable, object-oriented framework to define their physical filming reality and directorial vision before AI script treatment generation.
+We have successfully created and integrated the interactive In-TUI Constraint Library Management (CRUD) system for Logistical and Creative Constraint Sets in 48HFP-Studio.
 
----
+## Changes Completed
 
-## What Was Built
+### 1. Constraint Form Screens (`studio/screens_constraints.py`)
+* Created **`LogisticalConstraintScreen(ModalScreen[Optional[LogisticalConstraint]])`**:
+  * Form inputs for constraint name (slug), description, locations, sub-locations, location details, main character traits (name, traits, wardrobe, notes), and props & dialogue lines.
+  * Form validation, YAML saving via `save_logistical_constraint()`, and dismissal with the saved model.
+* Created **`CreativeConstraintScreen(ModalScreen[Optional[CreativeConstraint]])`**:
+  * Form inputs for constraint name (slug), description, scenarios, core philosophy, scene economy, progression & climax, and visuals/audio/post directives.
+  * Form validation, YAML saving via `save_creative_constraint()`, and dismissal with the saved model.
 
-### 1. Sprint 2.1: Constraint Data Models & Cross-Platform Storage
+### 2. Constraint Library Screen (`studio/screens_library.py`)
+* Created **`ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]])`**:
+  * Split layout featuring two `DataTable` widgets displaying all saved Logistical Sets and Creative Sets fetched via `list_logistical_constraints()` and `list_creative_constraints()`.
+  * Visual status badges (`✅ ACTIVE`) indicating currently assigned active constraints.
+  * Toolbar actions:
+    * **New Logistical**: Launches `LogisticalConstraintScreen`.
+    * **New Creative**: Launches `CreativeConstraintScreen`.
+    * **Edit Selected**: Loads selected model and launches form screen pre-populated.
+    * **Delete Selected**: Deletes constraint YAML file via `delete_logistical_constraint()` or `delete_creative_constraint()`, clearing active profile references if applicable.
+    * **Set Active**: Updates active constraint fields on `app_profile`, saves profile to `.48hfp_profile.yaml`, refreshes active indicators, and sends user notification.
 
-- **Pydantic Schemas ([studio/models/constraints.py](file:///home/andrew/48HFP%20App/studio/models/constraints.py))**:
-  - `CharacterDetail`: Character names, actor traits, wardrobe notes, and acting directives.
-  - `LogisticalConstraint`: Filming locations, sub-locations, location details (layout/lighting), main character extension, additional cast roster, available props, and dialogue hooks.
-  - `CreativeConstraint`: Pre-baked story scenarios, core philosophy & thematic spine, scene economy & pacing directives, progression & climax guidelines, visuals & post-production rules.
-  - Name slug validation enforcing valid file-safe identifiers.
+### 3. TUI Integration (`studio/tui.py`)
+* Added keybinding `("l", "open_library", "Constraint Library")` to `StudioApp.BINDINGS`.
+* Added trigger button `Button("📚 Constraints [L]", id="btn_library_modal")` to `NavigationSidebar`.
+* Implemented `action_open_library()` pushing `ConstraintLibraryScreen` with `update_profile` callback to trigger reactive HUD & sidebar updates.
 
-- **Global Profile Active Tracking ([studio/models/profile.py](file:///home/andrew/48HFP%20App/studio/models/profile.py))**:
-  - Extended `TeamProfile` with `active_logistical_constraint` and `active_creative_constraint` fields to track primed sets across CLI sessions.
-
-- **Dynamic Cross-Platform File Manager ([studio/utils/constraint_store.py](file:///home/andrew/48HFP%20App/studio/utils/constraint_store.py))**:
-  - Implemented strictly cross-platform path resolution using `Path.cwd() / "constraints"`.
-  - Automatic creation of `./constraints/logistical/` and `./constraints/creative/` directories relative to current working directory.
-  - Full CRUD YAML serialization routines (`save`, `load`, `list`, `delete`).
-  - **Auto-Seeding**: Automatic generation of starter sets (`interior_indie_crew` and `a24_slow_burn`) if the library is empty.
-
----
-
-### 2. Sprint 2.2: CLI Constraint Management (CRUD) & Rich UI
-
-- **Rich Terminal UI Components ([studio/utils/ui.py](file:///home/andrew/48HFP%20App/studio/utils/ui.py))**:
-  - `display_constraints_table`: Formatted Rich overview table with highlighted `[ACTIVE]` status badges.
-  - `display_logistical_detail` & `display_creative_detail`: Comprehensive Rich panels detailing set parameters.
-
-- **Typer Subcommand Group ([studio/constraints.py](file:///home/andrew/48HFP%20App/studio/constraints.py))**:
-  - `48hfp constraints list`: Table overview of all sets with active status markers.
-  - `48hfp constraints create`: Interactive wizard and flag-driven non-interactive set creator.
-  - `48hfp constraints show <name>`: Render detailed breakdown panels.
-  - `48hfp constraints edit <name>`: Interactive updater for existing sets.
-  - `48hfp constraints delete <name>`: Prompted removal with active state cleanup.
-  - `48hfp constraints set-active`: Hot-swap active logistical and creative sets.
-  - `48hfp constraints show-active`: View currently primed active sets.
-
-- **Main CLI Integration ([studio/cli.py](file:///home/andrew/48HFP%20App/studio/cli.py))**:
-  - Registered `constraints` and `constraint` subcommands.
-  - Updated `48hfp info` to display active constraint sets alongside team profile status.
+### 4. Unit Test Verification (`tests/test_phase6_4.py`)
+Created automated async tests covering:
+* `test_logistical_constraint_screen_submit()`
+* `test_logistical_constraint_screen_cancel()`
+* `test_creative_constraint_screen_submit()`
+* `test_creative_constraint_screen_cancel()`
+* `test_constraint_library_screen_rendering_and_set_active()`
+* `test_constraint_library_delete()`
+* `test_tui_integration_library_trigger()`
 
 ---
 
-## Verification & Testing Highlights
+## Verification Results
 
-### 1. Auto-Seeding & Set Listing
-Executing `python main.py constraints list` automatically seeded starter sets and rendered the library table:
-```
-                       📦 Unified Constraint Sets Library
-┏━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┓
-┃ Type         ┃ Name (Slug)              ┃    Status    ┃ Description         ┃
-┡━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━┩
-│ Logistical   │ interior_indie_crew      │    ACTIVE    │ Default indoor      │
-│              │                          │              │ indie shoot setup   │
-│ Creative     │ a24_slow_burn            │    ACTIVE    │ A24-style indie     │
-│              │                          │              │ psychological drama │
-└──────────────┴──────────────────────────┴──────────────┴─────────────────────┘
-```
-
-### 2. Hot-Swapping Active Sets (`set-active`)
-Command executed:
+### Test Suite Execution
 ```bash
-python main.py constraints set-active --logistical interior_indie_crew --creative a24_slow_burn
+python -m pytest
 ```
-Result: Global profile saved active constraint names and primed generation context.
+Output:
+```
+============================= test session starts ==============================
+platform linux -- Python 3.12.2, pytest-8.3.3, pluggy-1.5.0
+collected 33 items
 
-### 3. Verification of System Information (`info`)
-Command executed:
-```bash
-python main.py info
-```
-Output verified that global state reflects configured team profile and active primed constraint sets.
+tests/test_phase3.py ...                                                [  9%]
+tests/test_phase4.py ......                                             [ 27%]
+tests/test_phase5_2.py .                                                [ 30%]
+tests/test_phase5_3.py ...                                              [ 39%]
+tests/test_phase5_4.py .                                                [ 42%]
+tests/test_phase6_1.py ...                                              [ 51%]
+tests/test_phase6_2.py ......                                           [ 69%]
+tests/test_phase6_3.py ...                                              [ 78%]
+tests/test_phase6_4.py .......                                          [100%]
 
-### 4. Non-Interactive Set Creation & Deletion
-Commands executed:
-```bash
-python main.py constraints create --type logistical --name desert_motel --description "Gritty roadside motel shoot" --non-interactive
-python main.py constraints create --type creative --name thriller_noir --description "Fast paced crime thriller" --non-interactive
-python main.py constraints delete desert_motel --type logistical --force
-python main.py constraints delete thriller_noir --type creative --force
+============================== 33 passed in 10.74s ==============================
 ```
-Result: All files were created in `./constraints/logistical/` and `./constraints/creative/`, validated against Pydantic schemas, listed in the library table, and safely deleted.
