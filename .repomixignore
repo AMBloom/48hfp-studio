@@ -20,3 +20,11 @@ build/
 
 # Git directory
 .git/
+
+# Generated Outputs
+outputs/
+
+# Sprint Management Clutter
+implementation_plan*.md
+walkthrough*.md
+task.md
