@@ -6,12 +6,14 @@ import typer
 from rich.console import Console
 
 from studio import __version__
+from studio.cli_workspace import workspace_app
 from studio.config import config_app
 from studio.constraints import constraints_app
 from studio.draw import draw_app
 from studio.inference import InferenceEngine, InferenceError
 from studio.tui import StudioApp
 from studio.utils.draw_store import draw_exists, load_draw
+from studio.utils.global_state import get_active_workspace
 from studio.utils.profile_store import get_profile_path, load_profile, profile_exists
 from studio.utils.prompt_builder import PromptBuilder
 from studio.utils.treatment_store import save_treatment_output
@@ -29,6 +31,7 @@ app.add_typer(config_app, name="config")
 app.add_typer(constraints_app, name="constraints")
 app.add_typer(constraints_app, name="constraint")
 app.add_typer(draw_app, name="draw")
+app.add_typer(workspace_app, name="workspace")
 
 console = Console()
 
@@ -152,8 +155,11 @@ def generate_command(
 
 @app.command("info")
 def info() -> None:
-    """Display system status, CLI version, global profile, active constraints, and Friday Draw readiness."""
+    """Display system status, CLI version, active workspace, global profile, active constraints, and Friday Draw readiness."""
     print_banner()
+
+    active_ws = get_active_workspace()
+    ws_str = f"[bold cyan]{active_ws}[/bold cyan]" if active_ws else "[dim]Unset (Default CWD)[/dim]"
 
     p_path = get_profile_path()
     p_status = profile_exists()
@@ -219,7 +225,8 @@ def info() -> None:
 
     print_panel(
         content=f"[bold white]Status Overview[/bold white]\n\n"
-        f"Version: [cyan]{__version__}[/cyan]\n\n"
+        f"Version: [cyan]{__version__}[/cyan]\n"
+        f"Active Workspace: {ws_str}\n\n"
         f"Global Profile:\n{profile_info}\n\n"
         f"Friday Night Kickoff Draw:\n{draw_info}\n",
         title="🎬 System Information",

@@ -11,6 +11,7 @@ import re
 from typing import List, Optional
 
 from studio.models.treatment import TreatmentOutput
+from studio.utils.global_state import get_workspace_root
 from studio.utils.profile_store import load_profile
 
 
@@ -172,8 +173,8 @@ def save_treatment_output(
     Guardrail 2 (Version Zero-Padding): Formats version as v01, v02, v10, etc.
     Safe-Write System: Ensures previous outputs are NEVER overwritten.
     """
-    # Guardrail 1: Cross-Platform Pathing using Path.cwd()
-    target_dir = outputs_dir or (Path.cwd() / "outputs")
+    # Guardrail 1: Cross-Platform Pathing using active workspace or Path.cwd()
+    target_dir = outputs_dir or (get_workspace_root() / "outputs")
     target_dir.mkdir(parents=True, exist_ok=True)
 
     # Resolve active constraints for naming

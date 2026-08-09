@@ -5,11 +5,26 @@ from typing import Optional
 import yaml
 
 from studio.models.draw import FridayDraw
+from studio.utils.global_state import get_active_workspace, get_workspace_root
+
+LEGACY_DRAW_PATH = Path.home() / ".48hfp_draw.yaml"
 
 
 def get_draw_path() -> Path:
-    """Return the absolute path to the local Friday Draw storage YAML file (~/.48hfp_draw.yaml)."""
-    return Path.home() / ".48hfp_draw.yaml"
+    """Return path to Friday Draw storage YAML file relative to active workspace or fallback."""
+    active = get_active_workspace()
+    if active:
+        return active / "draw.yaml"
+
+    ws_root = get_workspace_root()
+    ws_draw = ws_root / "draw.yaml"
+    if ws_draw.exists():
+        return ws_draw
+
+    if LEGACY_DRAW_PATH.exists():
+        return LEGACY_DRAW_PATH
+
+    return ws_draw
 
 
 def draw_exists() -> bool:

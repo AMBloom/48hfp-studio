@@ -5,13 +5,27 @@ from typing import Optional
 import yaml
 
 from studio.models.profile import TeamProfile
+from studio.utils.global_state import get_active_workspace, get_workspace_root
 
-DEFAULT_PROFILE_PATH = Path.home() / ".48hfp_profile.yaml"
+LEGACY_PROFILE_PATH = Path.home() / ".48hfp_profile.yaml"
+DEFAULT_PROFILE_PATH = LEGACY_PROFILE_PATH
 
 
 def get_profile_path() -> Path:
-    """Return the persistent profile file path."""
-    return DEFAULT_PROFILE_PATH
+    """Return the persistent profile file path relative to active workspace or fallback."""
+    active = get_active_workspace()
+    if active:
+        return active / "profile.yaml"
+
+    ws_root = get_workspace_root()
+    ws_profile = ws_root / "profile.yaml"
+    if ws_profile.exists():
+        return ws_profile
+
+    if LEGACY_PROFILE_PATH.exists():
+        return LEGACY_PROFILE_PATH
+
+    return ws_profile
 
 
 def profile_exists(path: Optional[Path] = None) -> bool:

@@ -173,7 +173,7 @@ async def test_profile_setup_screen_with_cast_and_gear(tmp_path):
             screen.query_one("#cast_age", Input).value = "40s"
             screen.query_one("#cast_gender", Input).value = "Male"
             screen.query_one("#cast_physicality", Input).value = "Bearded, rugged"
-            await pilot.click("#add_cast_btn")
+            screen.query_one("#add_cast_btn").press()
             await pilot.pause()
 
             assert len(screen.cast) == 1
@@ -182,7 +182,7 @@ async def test_profile_setup_screen_with_cast_and_gear(tmp_path):
             # Gear
             screen.query_one("#available_gear", TextArea).text = "Canon C300 Mark III\nSennheiser MKH416"
 
-            await pilot.click("#save_profile_btn")
+            screen.query_one("#save_profile_btn").press()
             await pilot.pause()
 
             assert len(saved_results) == 1

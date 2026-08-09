@@ -189,5 +189,19 @@
     }
   },
   "active": "56b299c26ed40aac",
-  "lastOpenFiles": []
+  "lastOpenFiles": [
+    "walkthrough (1).md",
+    "constraints/thematic/greta_gerwig.yaml",
+    "constraints/directorial/greta_gerwig.yaml",
+    "constraints/thematic/paul_thomas_anderson.yaml",
+    "constraints/directorial/paul_thomas_anderson.yaml",
+    "constraints/thematic/lars_von_trier.yaml",
+    "constraints/directorial/lars_von_trier.yaml",
+    "constraints/thematic/alfonso_cuaron.yaml",
+    "constraints/directorial/alfonso_cuaron.yaml",
+    "constraints/thematic/jordan_peele.yaml",
+    "constraints/directorial/jordan_peele.yaml",
+    "implementation_plan_8_2.md",
+    "implementation_plan_8_1.md"
+  ]
 }

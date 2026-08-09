@@ -1,56 +1,58 @@
-# Sprint 7.2 Walkthrough - Data Model Refactor & Workspace Enhancements
+# Walkthrough: Phase 8, Sprint 8.2 - The Filmmaker Personality Quiz
 
-## Overview
-Sprint 7.2 delivers UI rendering stabilization, Pydantic data model refactoring for production teams and logistical constraints, interactive modal enhancements, transient prompt directive injection, and comprehensive unit/integration test coverage.
+We have successfully implemented **Phase 8, Sprint 8.2: The Filmmaker Personality Quiz** for the 48HFP-Studio application.
 
-## Key Changes Executed
+---
 
-### 1. UI Stabilization (The "Ghosting" Fix)
-- **[workspace.py](file:///home/andrew/48HFP%20App/studio/workspace.py)**: Wrapped `#recipe-content` inside a dedicated `#recipe-scroll` `VerticalScroll` container with explicit width constraints (`width: 100% - 2;`). This enforces a strict rendering boundary that prevents recipe text from ghosting or bleeding past the right border.
+## What Was Accomplished
 
-### 2. Roster Segmentation & Gear Inventory (`TeamProfile` Refactor)
-- **[profile.py](file:///home/andrew/48HFP%20App/studio/models/profile.py)**:
-  - Renamed `roles` to `crew: Dict[str, List[str]]`.
-  - Added `@model_validator(mode="before")` to automatically migrate legacy `roles` fields in YAML profiles to `crew`.
-  - Added `.roles` backward-compatibility property.
-  - Added `cast: List[Dict[str, str]]` (storing `name`, `age_range`, `gender`, `physicality`).
-  - Added `available_gear: List[str]` catalog.
-- **[screens.py](file:///home/andrew/48HFP%20App/studio/screens.py)**: Refactored `ProfileSetupScreen`:
-  - Separate **Crew Roster Builder** section with role selection, member name input, and crew `DataTable`.
-  - Separate **Cast Roster Builder** section with 4 distinct data inputs (`Name`, `Age Range`, `Gender`, `Physicality`) and dedicated cast `DataTable`.
-  - Dedicated `TextArea` widget for cataloging **Available Gear & Equipment**.
-- **[ui.py](file:///home/andrew/48HFP%20App/studio/utils/ui.py)**: Updated `display_profile_table` to render Crew, Cast, and Gear tables/panels.
+### 1. Mass Seeding (12 Director Archetypes)
+- Updated [constraint_store.py](file:///home/andrew/48HFP%20App/studio/utils/constraint_store.py) (`seed_default_constraints`) to pre-seed all 12 director archetypes as paired `DirectorialVision` and `ThematicFramework` YAML files in `constraints/directorial/` and `constraints/thematic/`.
+- Seeded archetypes:
+  1. **Wes Anderson** (`wes_anderson`)
+  2. **Wong Kar-wai** (`wong_kar_wai`)
+  3. **David Lynch** (`david_lynch`)
+  4. **Bong Joon-ho** (`bong_joon_ho`)
+  5. **Denis Villeneuve** (`denis_villeneuve`)
+  6. **Nicolas Winding Refn** (`nicolas_winding_refn`)
+  7. **Céline Sciamma** (`celine_sciamma`)
+  8. **Jordan Peele** (`jordan_peele`)
+  9. **Alfonso Cuarón** (`alfonso_cuaron`)
+  10. **Lars von Trier** (`lars_von_trier`)
+  11. **Paul Thomas Anderson** (`paul_thomas_anderson`)
+  12. **Greta Gerwig** (`greta_gerwig`)
 
-### 3. Logistical Schema Cleanup
-- **[constraints.py](file:///home/andrew/48HFP%20App/studio/models/constraints.py)**:
-  - Removed obsolete `main_character_details` field.
-  - Renamed `props_and_dialogue` to `available_set_dressing: List[str]`.
-  - Added `@model_validator(mode="before")` for smooth deserialization of legacy constraint files.
-  - Added `.props_and_dialogue` backward-compatibility property.
-- **[screens_constraints.py](file:///home/andrew/48HFP%20App/studio/screens_constraints.py)**:
-  - Removed main character inputs from `LogisticalConstraintScreen`.
-  - Renamed props input to "Available Set Dressing & Wardrobe".
-  - **Bug Fix**: Extracted `location_details` from `TextArea("#location_details")` during `action_save()`.
-- **[ui.py](file:///home/andrew/48HFP%20App/studio/utils/ui.py)**: Updated `display_logistical_detail` to display set dressing and remove main character section.
+### 2. Quiz Logic Engine
+- Created [quiz.py](file:///home/andrew/48HFP%20App/studio/quiz.py) defining:
+  - Data structures: `QuizOption`, `QuizQuestion`, `ArchetypeInfo`, `QuizResult`.
+  - `ARCHETYPE_LIBRARY`: Complete display metadata (titles, quotes, visual styles, thematic cores) for all 12 directors.
+  - `QUIZ_QUESTIONS`: 10 multiple-choice questions (5 abstract atmospheric + 5 on-set practical scenarios).
+  - `QuizEngine`: Tallying matrix that sums score weights across selected options and identifies the winning director.
 
-### 4. Transient "Additional Instructions" & Prompt Compiler
-- **[workspace.py](file:///home/andrew/48HFP%20App/studio/workspace.py)**: Added `TextArea(id="additional_instructions")` widget with fixed height (`height: 5; max-height: 6;`) to prevent overflowing the "Generate Treatment" button.
-- **[tui.py](file:///home/andrew/48HFP%20App/studio/tui.py)**: Updated `action_generate_treatment()` to query the `#additional_instructions` text from `RecipePane` and pass it to the compiler.
-- **[prompt_builder.py](file:///home/andrew/48HFP%20App/studio/utils/prompt_builder.py)**:
-  - Updated `compile_system_prompt()` to accept `additional_instructions: Optional[str] = None`.
-  - If provided and non-empty, injects a new `ADDITIONAL FILMMAKER DIRECTIVES` section into the prompt hierarchy directly above Output Schema Directives.
-  - If `additional_instructions` is empty or only whitespace, the section is completely omitted from the prompt to conserve tokens.
-  - Updated global state and logistical sections to format Crew, Cast, Gear, and Set Dressing.
+### 3. TUI Onboarding Quiz Modal
+- Created [screens_quiz.py](file:///home/andrew/48HFP%20App/studio/screens_quiz.py) with `OnboardingQuizScreen`:
+  - Renders question progress, category labels, prompts, and option choice buttons.
+  - Supports Next/Previous navigation and completion result view.
+  - Features an `[Activate <Director> Constraints]` button that sets `active_directorial_vision` and `active_thematic_framework` in the active `TeamProfile`.
+- Updated [tui.py](file:///home/andrew/48HFP%20App/studio/tui.py):
+  - Added `"🔮 Filmmaker Quiz [Z]"` button to `NavigationSidebar`.
+  - Added `z` keyboard shortcut binding and callback handler to launch the quiz modal.
 
-### 5. Test Suite Updates
-- **[test_phase7_2.py](file:///home/andrew/48HFP%20App/tests/test_phase7_2.py)**: Added 7 unit and async pilot integration tests.
-  - Verification: All 41 unit and integration tests across the entire test suite passed cleanly (`41 passed in 4.70s`).
+### 4. CLI Workspace Quiz Command
+- Updated [cli_workspace.py](file:///home/andrew/48HFP%20App/studio/cli_workspace.py):
+  - Added `@workspace_app.command("quiz")` enabling users to run `48hfp workspace quiz`.
+  - Presents questions with Rich panels and prompt selection.
+  - Displays winning director summary card and offers a Y/N prompt to activate constraints in the active profile.
 
 ---
 
 ## Verification Results
 
-```bash
-$ pytest tests/
-============================== 41 passed in 4.70s ==============================
-```
+### Automated Test Suite
+- Created new test file [test_phase8_2.py](file:///home/andrew/48HFP%20App/tests/test_phase8_2.py) covering:
+  - Mass seeding of all 12 director archetype constraint sets.
+  - Quiz Engine mathematical reachability (verified that all 12 director slugs can be won with specific response vectors).
+  - CLI `48hfp workspace quiz` execution and profile activation.
+  - TUI `OnboardingQuizScreen` modal instantiation.
+- Executed `python -m pytest`:
+  - **78 passed in 19.45s** (100% pass rate).

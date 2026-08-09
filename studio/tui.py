@@ -1,5 +1,6 @@
 """Stateful Terminal User Interface (TUI) for 48HFP-Studio using Textual."""
 
+from pathlib import Path
 from typing import Optional
 from textual import work
 from textual.app import App, ComposeResult
@@ -12,7 +13,9 @@ from studio.models.draw import FridayDraw
 from studio.models.profile import TeamProfile
 from studio.screens import ApiSettingsScreen, DrawWizardScreen, ProfileSetupScreen
 from studio.screens_library import ConstraintLibraryScreen
+from studio.screens_quiz import OnboardingQuizScreen
 from studio.utils.draw_store import load_draw
+from studio.utils.global_state import get_active_workspace
 from studio.utils.profile_store import load_profile
 from studio.utils.prompt_builder import PromptBuilder
 from studio.utils.treatment_store import (
@@ -23,7 +26,7 @@ from studio.workspace import DEFAULT_WELCOME_MARKDOWN, StudioWorkspace
 
 
 class HeaderHUD(Static):
-    """Persistent Header HUD widget displaying application title and version."""
+    """Persistent Header HUD widget displaying application title, active workspace, and team profile."""
 
     profile: reactive[Optional[TeamProfile]] = reactive(None)
     draw: reactive[Optional[FridayDraw]] = reactive(None)
@@ -50,12 +53,16 @@ class HeaderHUD(Static):
         self.update_content()
 
     def update_content(self) -> None:
+        ws = get_active_workspace()
+        ws_str = f" | Workspace: {ws.name}" if ws else ""
         team_str = f" | Team: {self.profile.team_name}" if self.profile else ""
-        self.update(f"🎬 48HFP-Studio v2.0{team_str}")
+        self.update(f"🎬 48HFP-Studio v2.0{ws_str}{team_str}")
 
     def render(self) -> str:
+        ws = get_active_workspace()
+        ws_str = f" | Workspace: {ws.name}" if ws else ""
         team_str = f" | Team: {self.profile.team_name}" if self.profile else ""
-        return f"🎬 48HFP-Studio v2.0{team_str}"
+        return f"🎬 48HFP-Studio v2.0{ws_str}{team_str}"
 
 
 class NavigationSidebar(Static):
@@ -88,10 +95,14 @@ class NavigationSidebar(Static):
     def compose(self) -> ComposeResult:
         yield Button("👤 Profile Setup [P]", id="btn_profile_modal", variant="default")
         yield Button("🎲 Friday Draw [D]", id="btn_draw_modal", variant="primary")
+        yield Button("🔮 Filmmaker Quiz [Z]", id="btn_quiz_modal", variant="default")
         yield Button("📚 Constraints [L]", id="btn_library_modal", variant="default")
         yield Button("⚙️ Settings [S]", id="btn_settings_modal", variant="default")
 
     def update_content(self) -> None:
+        ws = get_active_workspace()
+        ws_info = f"[bold cyan]{ws.name}[/bold cyan]" if ws else "[dim]Unset (CWD)[/dim]"
+
         if self.profile:
             team_info = f"[bold green]{self.profile.team_name}[/bold green]"
             admin_info = f"Admin: [cyan]{self.profile.admin_username}[/cyan]"
@@ -112,6 +123,8 @@ class NavigationSidebar(Static):
 
         content = (
             "🧭 [bold cyan]NAVIGATION[/bold cyan]\n\n"
+            "📂 [bold white]PROJECT WORKSPACE[/bold white]\n"
+            f"• Workspace: {ws_info}\n\n"
             "👤 [bold white]TEAM STATUS[/bold white]\n"
             f"• {team_info}\n"
             f"• {admin_info}\n"
@@ -146,6 +159,7 @@ class StudioApp(App):
     BINDINGS = [
         ("d", "open_draw_wizard", "Friday Draw"),
         ("p", "open_profile_setup", "Profile Setup"),
+        ("z", "open_quiz", "Filmmaker Quiz"),
         ("l", "open_library", "Constraint Library"),
         ("s", "open_api_settings", "API Settings"),
         ("g", "generate_treatment", "Generate Treatment"),
@@ -204,6 +218,10 @@ class StudioApp(App):
     def action_open_profile_setup(self) -> None:
         """Push the ProfileSetupScreen modal."""
         self.push_screen(ProfileSetupScreen(self.app_profile), callback=self.update_profile)
+
+    def action_open_quiz(self) -> None:
+        """Push the OnboardingQuizScreen modal."""
+        self.push_screen(OnboardingQuizScreen(), callback=self.update_profile)
 
     def action_open_library(self) -> None:
         """Push the ConstraintLibraryScreen modal."""
@@ -292,6 +310,8 @@ class StudioApp(App):
             self.action_open_draw_wizard()
         elif event.button.id == "btn_profile_modal":
             self.action_open_profile_setup()
+        elif event.button.id == "btn_quiz_modal":
+            self.action_open_quiz()
         elif event.button.id == "btn_library_modal":
             self.action_open_library()
         elif event.button.id == "btn_settings_modal":

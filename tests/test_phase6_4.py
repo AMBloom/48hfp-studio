@@ -52,11 +52,7 @@ async def test_logistical_constraint_screen_submit(tmp_path):
             screen.query_one("#locations", Input).value = "Warehouse, Industrial, Night"
             screen.query_one("#sub_locations", Input).value = "Loading Dock, Boiler Room"
             screen.query_one("#location_details", TextArea).text = "Echoey acoustics with harsh overhead spotlights"
-            screen.query_one("#main_char_name", Input).value = "Night Guard"
-            screen.query_one("#main_char_traits", Input).value = "50s, weary posture"
-            screen.query_one("#main_char_wardrobe", Input).value = "Security uniform, flashlight belt"
-            screen.query_one("#main_char_notes", Input).value = "Close to retirement"
-            screen.query_one("#props_and_dialogue", TextArea).text = "Heavy keyring\n'Who's there?'"
+            screen.query_one("#available_set_dressing", TextArea).text = "Heavy keyring\nSecurity uniform"
 
             await pilot.click("#save_logistical_btn")
             await pilot.pause()
@@ -67,9 +63,7 @@ async def test_logistical_constraint_screen_submit(tmp_path):
             assert saved.name == "warehouse_night"
             assert "Warehouse" in saved.locations
             assert "Boiler Room" in saved.sub_locations
-            assert saved.main_character_details is not None
-            assert saved.main_character_details.name == "Night Guard"
-            assert "Heavy keyring" in saved.props_and_dialogue
+            assert "Heavy keyring" in saved.available_set_dressing
 
             saved_file = constraints_dir / "logistical" / "warehouse_night.yaml"
             assert saved_file.exists()

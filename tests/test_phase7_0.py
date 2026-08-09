@@ -153,8 +153,8 @@ def test_seed_default_constraints(tmp_path):
         assert p_idea is not None and p_idea.exists()
 
         assert len(list_logistical_constraints()) == 1
-        assert len(list_directorial_visions()) == 1
-        assert len(list_thematic_frameworks()) == 1
+        assert len(list_directorial_visions()) == 12
+        assert len(list_thematic_frameworks()) == 12
         assert len(list_idea_seeds()) == 1
 
 
@@ -301,14 +301,14 @@ async def test_constraint_library_tab_switching_and_activation(tmp_path, sample_
             # Set active on directorial tab
             dir_table = library_screen.query_one("#directorial_table")
             dir_table.focus()
-            row_idx = dir_table.get_row_index("a24_slow_burn")
+            row_idx = dir_table.get_row_index("wes_anderson")
             dir_table.move_cursor(row=row_idx)
             await pilot.pause()
 
             library_screen.query_one("#btn_set_active", Button).press()
             await pilot.pause()
 
-            assert sample_profile.active_directorial_vision == "a24_slow_burn"
+            assert sample_profile.active_directorial_vision == "wes_anderson"
 
             # Switch to Thematic tab
             tabbed.active = "tab_thematic"
@@ -319,11 +319,11 @@ async def test_constraint_library_tab_switching_and_activation(tmp_path, sample_
             # Set active on thematic tab
             them_table = library_screen.query_one("#thematic_table")
             them_table.focus()
-            row_idx = them_table.get_row_index("existential_dread")
+            row_idx = them_table.get_row_index("wes_anderson")
             them_table.move_cursor(row=row_idx)
             await pilot.pause()
 
             library_screen.query_one("#btn_set_active", Button).press()
             await pilot.pause()
 
-            assert sample_profile.active_thematic_framework == "existential_dread"
+            assert sample_profile.active_thematic_framework == "wes_anderson"
