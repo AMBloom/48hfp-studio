@@ -6,7 +6,12 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from studio.models.constraints import CreativeConstraint, LogisticalConstraint
+from studio.models.constraints import (
+    DirectorialVision,
+    IdeaSeed,
+    LogisticalConstraint,
+    ThematicFramework,
+)
 from studio.models.draw import FridayDraw
 
 console = Console()
@@ -48,11 +53,16 @@ def display_profile_table(
     team_name: str,
     admin_username: str,
     location: str,
-    roles: Dict[str, List[str]],
+    crew: Optional[Dict[str, List[str]]] = None,
+    cast: Optional[List[Dict[str, str]]] = None,
+    available_gear: Optional[List[str]] = None,
     custom_details: Optional[str] = None,
     updated_at: Optional[str] = None,
+    roles: Optional[Dict[str, List[str]]] = None,
 ) -> None:
     """Display the team configuration profile in formatted Rich tables and panels."""
+    final_crew = crew or roles or {}
+
     # Overview Table
     summary_table = Table(title="📋 Production Team Summary", border_style="cyan", show_header=True)
     summary_table.add_column("Property", style="bold bright_white", width=20)
@@ -66,19 +76,47 @@ def display_profile_table(
 
     console.print(summary_table)
 
-    # Roles Roster Table
-    roles_table = Table(title="🎭 Team Roster & Roles", border_style="magenta", show_header=True)
+    # Crew Table
+    roles_table = Table(title="🎥 Crew Roster & Roles", border_style="magenta", show_header=True)
     roles_table.add_column("Role", style="bold yellow", width=25)
     roles_table.add_column("Assigned Member(s)", style="white")
 
-    if roles:
-        for role_name, members in roles.items():
+    if final_crew:
+        for role_name, members in final_crew.items():
             members_str = ", ".join(members) if members else "[dim]Unassigned[/dim]"
             roles_table.add_row(role_name, members_str)
     else:
         roles_table.add_row("No roles assigned", "[dim]Use '48hfp config setup' to add roles[/dim]")
 
     console.print(roles_table)
+
+    # Cast Table
+    if cast:
+        cast_table = Table(title="🎭 Cast Roster", border_style="green", show_header=True)
+        cast_table.add_column("Actor / Char Name", style="bold white", width=20)
+        cast_table.add_column("Age Range", style="yellow", width=15)
+        cast_table.add_column("Gender", style="cyan", width=12)
+        cast_table.add_column("Physicality / Appearance", style="white")
+
+        for actor in cast:
+            cast_table.add_row(
+                actor.get("name", "Unknown"),
+                actor.get("age_range", "N/A"),
+                actor.get("gender", "N/A"),
+                actor.get("physicality", "N/A"),
+            )
+        console.print(cast_table)
+
+    # Available Gear Table/Panel
+    if available_gear:
+        gear_str = "\n".join([f"• {g}" for g in available_gear])
+        console.print(
+            Panel(
+                gear_str,
+                title="[bold cyan]🛠️ Available Gear & Equipment Catalog[/bold cyan]",
+                border_style="cyan",
+            )
+        )
 
     # Custom Details Panel
     if custom_details and custom_details.strip():
@@ -101,18 +139,23 @@ def display_profile_table(
 
 def display_constraints_table(
     logistical_sets: List[LogisticalConstraint],
-    creative_sets: List[CreativeConstraint],
+    directorial_sets: List[DirectorialVision],
+    thematic_sets: List[ThematicFramework],
+    idea_sets: List[IdeaSeed],
     active_logistical: Optional[str] = None,
-    active_creative: Optional[str] = None,
+    active_directorial: Optional[str] = None,
+    active_thematic: Optional[str] = None,
+    active_idea: Optional[str] = None,
 ) -> None:
     """Display overview table of all available constraint sets with active badges."""
-    table = Table(title="📦 Unified Constraint Sets Library", border_style="cyan", show_header=True)
-    table.add_column("Type", style="bold yellow", width=12)
+    table = Table(title="📦 Tri-Split Constraint Sets Library", border_style="cyan", show_header=True)
+    table.add_column("Type", style="bold yellow", width=16)
     table.add_column("Name (Slug)", style="bold bright_white", width=24)
     table.add_column("Status", width=12, justify="center")
     table.add_column("Description", style="white")
 
-    if not logistical_sets and not creative_sets:
+    all_empty = not any([logistical_sets, directorial_sets, thematic_sets, idea_sets])
+    if all_empty:
         table.add_row("-", "No sets found", "-", "[dim]No constraint sets available.[/dim]")
     else:
         for lc in logistical_sets:
@@ -121,11 +164,23 @@ def display_constraints_table(
             desc = lc.description[:60] + "..." if len(lc.description) > 60 else lc.description
             table.add_row("Logistical", f"[cyan]{lc.name}[/cyan]", status_badge, desc or "[dim]No description[/dim]")
 
-        for cc in creative_sets:
-            is_active = active_creative == cc.name
+        for dv in directorial_sets:
+            is_active = active_directorial == dv.name
             status_badge = "[bold black on green] ACTIVE [/bold black on green]" if is_active else "[dim]Inactive[/dim]"
-            desc = cc.description[:60] + "..." if len(cc.description) > 60 else cc.description
-            table.add_row("Creative", f"[magenta]{cc.name}[/magenta]", status_badge, desc or "[dim]No description[/dim]")
+            desc = dv.description[:60] + "..." if len(dv.description) > 60 else dv.description
+            table.add_row("Directorial Vision", f"[magenta]{dv.name}[/magenta]", status_badge, desc or "[dim]No description[/dim]")
+
+        for tf in thematic_sets:
+            is_active = active_thematic == tf.name
+            status_badge = "[bold black on green] ACTIVE [/bold black on green]" if is_active else "[dim]Inactive[/dim]"
+            desc = tf.description[:60] + "..." if len(tf.description) > 60 else tf.description
+            table.add_row("Thematic Framework", f"[blue]{tf.name}[/blue]", status_badge, desc or "[dim]No description[/dim]")
+
+        for ids in idea_sets:
+            is_active = active_idea == ids.name
+            status_badge = "[bold black on green] ACTIVE [/bold black on green]" if is_active else "[dim]Inactive[/dim]"
+            desc = ids.description[:60] + "..." if len(ids.description) > 60 else ids.description
+            table.add_row("Idea Seed", f"[green]{ids.name}[/green]", status_badge, desc or "[dim]No description[/dim]")
 
     console.print(table)
 
@@ -140,16 +195,6 @@ def display_logistical_detail(constraint: LogisticalConstraint, is_active: bool 
     content += f"[bold yellow]Sub-Locations:[/bold yellow] {', '.join(constraint.sub_locations) if constraint.sub_locations else 'None'}\n"
     content += f"[bold yellow]Location Details:[/bold yellow]\n{constraint.location_details or 'None'}\n\n"
 
-    content += "[bold yellow]Main Character Details:[/bold yellow]\n"
-    if constraint.main_character_details:
-        mc = constraint.main_character_details
-        content += f"  • Name: [bold white]{mc.name}[/bold white]\n"
-        content += f"    Traits: {mc.actor_traits or 'N/A'}\n"
-        content += f"    Wardrobe: {mc.wardrobe or 'N/A'}\n"
-        content += f"    Notes: {mc.notes or 'N/A'}\n\n"
-    else:
-        content += "  [dim]None specified[/dim]\n\n"
-
     content += "[bold yellow]Other Characters:[/bold yellow]\n"
     if constraint.other_characters:
         for char in constraint.other_characters:
@@ -158,9 +203,10 @@ def display_logistical_detail(constraint: LogisticalConstraint, is_active: bool 
     else:
         content += "  [dim]None specified[/dim]\n\n"
 
-    content += "[bold yellow]Props & Dialogue Elements:[/bold yellow]\n"
-    if constraint.props_and_dialogue:
-        for item in constraint.props_and_dialogue:
+    content += "[bold yellow]Available Set Dressing & Wardrobe:[/bold yellow]\n"
+    dressing = constraint.available_set_dressing
+    if dressing:
+        for item in dressing:
             content += f"  • {item}\n"
     else:
         content += "  [dim]None specified[/dim]\n"
@@ -170,28 +216,46 @@ def display_logistical_detail(constraint: LogisticalConstraint, is_active: bool 
     console.print(Panel(content, title=title, border_style="green" if is_active else "cyan"))
 
 
-def display_creative_detail(constraint: CreativeConstraint, is_active: bool = False) -> None:
-    """Display detailed breakdown panel for a Creative Constraint Set."""
+def display_directorial_detail(constraint: DirectorialVision, is_active: bool = False) -> None:
+    """Display detailed breakdown panel for a Directorial Vision Set."""
     status_header = " [bold black on green] ACTIVE SET [/bold black on green]" if is_active else ""
-    title = f"🎨 Creative Constraint Set: [bold magenta]{constraint.name}[/bold magenta]{status_header}"
+    title = f"🎬 Directorial Vision: [bold magenta]{constraint.name}[/bold magenta]{status_header}"
 
     content = f"[bold white]Description:[/bold white] {constraint.description or 'None'}\n\n"
-    content += "[bold yellow]Pre-Baked Story Scenarios:[/bold yellow]\n"
-    if constraint.scenarios:
-        for idx, sc in enumerate(constraint.scenarios, 1):
-            content += f"  {idx}. {sc}\n"
-        content += "\n"
-    else:
-        content += "  [dim]None specified[/dim]\n\n"
-
-    content += f"[bold yellow]Core Philosophy & Motivation:[/bold yellow]\n{constraint.core_philosophy or 'None'}\n\n"
-    content += f"[bold yellow]Scene Economy & Pacing:[/bold yellow]\n{constraint.scene_economy or 'None'}\n\n"
-    content += f"[bold yellow]Progression & Climax Structure:[/bold yellow]\n{constraint.progression_and_climax or 'None'}\n\n"
-    content += f"[bold yellow]Visuals & Post-Production Guidelines:[/bold yellow]\n{constraint.visuals_and_post or 'None'}\n\n"
-
+    content += f"[bold yellow]Visual Economy & Camera Movement:[/bold yellow]\n{constraint.visual_economy or 'None'}\n\n"
+    content += f"[bold yellow]Lighting & Color Grading Intent:[/bold yellow]\n{constraint.lighting_color or 'None'}\n\n"
+    content += f"[bold yellow]Audio Landscape & Music Intent:[/bold yellow]\n{constraint.audio_landscape or 'None'}\n\n"
     content += f"[dim]Created: {constraint.created_at} | Updated: {constraint.updated_at}[/dim]"
 
     console.print(Panel(content, title=title, border_style="green" if is_active else "magenta"))
+
+
+def display_thematic_detail(constraint: ThematicFramework, is_active: bool = False) -> None:
+    """Display detailed breakdown panel for a Thematic Framework Set."""
+    status_header = " [bold black on green] ACTIVE SET [/bold black on green]" if is_active else ""
+    title = f"🧠 Thematic Framework: [bold blue]{constraint.name}[/bold blue]{status_header}"
+
+    content = f"[bold white]Description:[/bold white] {constraint.description or 'None'}\n\n"
+    content += f"[bold yellow]Core Philosophy & Subtext:[/bold yellow]\n{constraint.core_philosophy or 'None'}\n\n"
+    content += f"[bold yellow]Emotional Arc & Climax Dynamics:[/bold yellow]\n{constraint.emotional_arc or 'None'}\n\n"
+    content += f"[bold yellow]World Rules & Atmospheric Logic:[/bold yellow]\n{constraint.world_rules or 'None'}\n\n"
+    content += f"[dim]Created: {constraint.created_at} | Updated: {constraint.updated_at}[/dim]"
+
+    console.print(Panel(content, title=title, border_style="green" if is_active else "blue"))
+
+
+def display_idea_detail(constraint: IdeaSeed, is_active: bool = False) -> None:
+    """Display detailed breakdown panel for an Idea Seed Set."""
+    status_header = " [bold black on green] ACTIVE SET [/bold black on green]" if is_active else ""
+    title = f"💡 Idea Seed: [bold green]{constraint.name}[/bold green]{status_header}"
+
+    content = f"[bold white]Description:[/bold white] {constraint.description or 'None'}\n\n"
+    content += f"[bold yellow]Inciting Incident / Initial Spark:[/bold yellow]\n{constraint.inciting_incident or 'None'}\n\n"
+    content += f"[bold yellow]Complications & Midpoint Twists:[/bold yellow]\n{constraint.complications or 'None'}\n\n"
+    content += f"[bold yellow]Ending Targets & Resolution Notes:[/bold yellow]\n{constraint.ending_targets or 'None'}\n\n"
+    content += f"[dim]Created: {constraint.created_at} | Updated: {constraint.updated_at}[/dim]"
+
+    console.print(Panel(content, title=title, border_style="green" if is_active else "yellow"))
 
 
 def display_draw_table(draw: FridayDraw) -> None:

@@ -8,12 +8,16 @@ from textual.widgets import Button, Input, Label, TextArea
 
 from studio.models.constraints import (
     CharacterDetail,
-    CreativeConstraint,
+    DirectorialVision,
+    IdeaSeed,
     LogisticalConstraint,
+    ThematicFramework,
 )
 from studio.utils.constraint_store import (
-    save_creative_constraint,
+    save_directorial_vision,
+    save_idea_seed,
     save_logistical_constraint,
+    save_thematic_framework,
 )
 
 
@@ -28,7 +32,8 @@ class LogisticalConstraintScreen(ModalScreen[Optional[LogisticalConstraint]]):
 
     #logistical-dialog {
         padding: 1 2;
-        width: 72;
+        width: 85%;
+        max-width: 75;
         height: auto;
         max-height: 90%;
         background: $surface;
@@ -43,6 +48,10 @@ class LogisticalConstraintScreen(ModalScreen[Optional[LogisticalConstraint]]):
         color: $text;
         text-style: bold;
         margin-bottom: 0;
+    }
+
+    VerticalScroll {
+        height: 1fr;
     }
 
     TextArea {
@@ -114,43 +123,11 @@ class LogisticalConstraintScreen(ModalScreen[Optional[LogisticalConstraint]]):
                     id="location_details",
                 )
 
-                yield Label("Main Character Name:", classes="field-label")
-                main_char = c.main_character_details if c else None
-                yield Input(
-                    value=main_char.name if main_char else "",
-                    placeholder="e.g. Protagonist",
-                    id="main_char_name",
-                    classes="form-field",
-                )
-
-                yield Label("Main Character Actor Traits:", classes="field-label")
-                yield Input(
-                    value=main_char.actor_traits if main_char else "",
-                    placeholder="e.g. Late 20s, expressive eyes",
-                    id="main_char_traits",
-                    classes="form-field",
-                )
-
-                yield Label("Main Character Wardrobe:", classes="field-label")
-                yield Input(
-                    value=main_char.wardrobe if main_char else "",
-                    placeholder="e.g. Denim jacket, sneakers",
-                    id="main_char_wardrobe",
-                    classes="form-field",
-                )
-
-                yield Label("Main Character Notes:", classes="field-label")
-                yield Input(
-                    value=main_char.notes if main_char else "",
-                    placeholder="e.g. Anxious under pressure",
-                    id="main_char_notes",
-                    classes="form-field",
-                )
-
-                yield Label("Props & Dialogue Hooks (one per line):", classes="field-label")
+                yield Label("Available Set Dressing & Wardrobe (one per line):", classes="field-label")
+                set_dressing_items = c.available_set_dressing if c else []
                 yield TextArea(
-                    "\n".join(c.props_and_dialogue) if c else "",
-                    id="props_and_dialogue",
+                    "\n".join(set_dressing_items),
+                    id="available_set_dressing",
                 )
 
             with Horizontal(id="button-bar"):
@@ -180,24 +157,10 @@ class LogisticalConstraintScreen(ModalScreen[Optional[LogisticalConstraint]]):
         sub_loc_raw = self.query_one("#sub_locations", Input).value
         sub_loc_list = [x.strip() for x in sub_loc_raw.split(",") if x.strip()]
 
-        loc_details = self.query_one("#location_details", TextArea).text
+        loc_details = self.query_one("#location_details", TextArea).text.strip()
 
-        c_name = self.query_one("#main_char_name", Input).value.strip()
-        c_traits = self.query_one("#main_char_traits", Input).value.strip()
-        c_wardrobe = self.query_one("#main_char_wardrobe", Input).value.strip()
-        c_notes = self.query_one("#main_char_notes", Input).value.strip()
-
-        main_char = None
-        if c_name or c_traits or c_wardrobe or c_notes:
-            main_char = CharacterDetail(
-                name=c_name or "Character",
-                actor_traits=c_traits,
-                wardrobe=c_wardrobe,
-                notes=c_notes,
-            )
-
-        props_raw = self.query_one("#props_and_dialogue", TextArea).text
-        props_list = [x.strip() for x in props_raw.splitlines() if x.strip()]
+        dressing_raw = self.query_one("#available_set_dressing", TextArea).text
+        dressing_list = [x.strip() for x in dressing_raw.splitlines() if x.strip()]
 
         other_chars = self.constraint.other_characters if self.constraint else []
 
@@ -207,27 +170,27 @@ class LogisticalConstraintScreen(ModalScreen[Optional[LogisticalConstraint]]):
             locations=loc_list,
             sub_locations=sub_loc_list,
             location_details=loc_details,
-            main_character_details=main_char,
             other_characters=other_chars,
-            props_and_dialogue=props_list,
+            available_set_dressing=dressing_list,
         )
 
         save_logistical_constraint(constraint)
         self.dismiss(constraint)
 
 
-class CreativeConstraintScreen(ModalScreen[Optional[CreativeConstraint]]):
-    """Interactive Modal Screen for entering or editing a Creative Constraint Set."""
+class DirectorialVisionScreen(ModalScreen[Optional[DirectorialVision]]):
+    """Interactive Modal Screen for entering or editing a Directorial Vision set."""
 
     DEFAULT_CSS = """
-    CreativeConstraintScreen {
+    DirectorialVisionScreen {
         align: center middle;
         background: rgba(0, 0, 0, 0.7);
     }
 
-    #creative-dialog {
+    #directorial-dialog {
         padding: 1 2;
-        width: 72;
+        width: 85%;
+        max-width: 75;
         height: auto;
         max-height: 90%;
         background: $surface;
@@ -242,6 +205,10 @@ class CreativeConstraintScreen(ModalScreen[Optional[CreativeConstraint]]):
         color: $text;
         text-style: bold;
         margin-bottom: 0;
+    }
+
+    VerticalScroll {
+        height: 1fr;
     }
 
     TextArea {
@@ -264,18 +231,18 @@ class CreativeConstraintScreen(ModalScreen[Optional[CreativeConstraint]]):
         ("escape", "cancel", "Cancel"),
     ]
 
-    def __init__(self, constraint: Optional[CreativeConstraint] = None) -> None:
+    def __init__(self, constraint: Optional[DirectorialVision] = None) -> None:
         super().__init__()
         self.constraint = constraint
 
     def compose(self) -> ComposeResult:
         c = self.constraint
-        with Container(id="creative-dialog"):
+        with Container(id="directorial-dialog"):
             yield Label(
-                "🎨 [bold magenta]CREATIVE CONSTRAINT SET[/bold magenta]\n", classes="title"
+                "🎬 [bold magenta]DIRECTORIAL VISION SET[/bold magenta]\n", classes="title"
             )
             with VerticalScroll():
-                yield Label("Constraint Set Name (Slug):", classes="field-label")
+                yield Label("Vision Set Name (Slug):", classes="field-label")
                 yield Input(
                     value=c.name if c else "",
                     placeholder="e.g. a24_slow_burn",
@@ -286,79 +253,332 @@ class CreativeConstraintScreen(ModalScreen[Optional[CreativeConstraint]]):
                 yield Label("Description:", classes="field-label")
                 yield Input(
                     value=c.description if c else "",
-                    placeholder="e.g. Indie psychological drama",
+                    placeholder="e.g. Indie psychological drama vision",
                     id="description",
                     classes="form-field",
                 )
 
-                yield Label("Scenarios (one per line):", classes="field-label")
+                yield Label("Visual Economy & Camera Pacing:", classes="field-label")
                 yield TextArea(
-                    "\n".join(c.scenarios) if c else "",
-                    id="scenarios",
+                    c.visual_economy if c else "",
+                    id="visual_economy",
                 )
 
-                yield Label("Core Philosophy / Thematic Spine:", classes="field-label")
+                yield Label("Lighting Mood & Color Palette:", classes="field-label")
                 yield TextArea(
-                    c.core_philosophy if c else "",
-                    id="core_philosophy",
+                    c.lighting_color if c else "",
+                    id="lighting_color",
                 )
 
-                yield Label("Scene Economy / Pacing Directives:", classes="field-label")
+                yield Label("Audio Landscape & Music Intent:", classes="field-label")
                 yield TextArea(
-                    c.scene_economy if c else "",
-                    id="scene_economy",
-                )
-
-                yield Label("Progression & Climax Dynamics:", classes="field-label")
-                yield TextArea(
-                    c.progression_and_climax if c else "",
-                    id="progression_and_climax",
-                )
-
-                yield Label("Visuals, Audio & Post-Production Intent:", classes="field-label")
-                yield TextArea(
-                    c.visuals_and_post if c else "",
-                    id="visuals_and_post",
+                    c.audio_landscape if c else "",
+                    id="audio_landscape",
                 )
 
             with Horizontal(id="button-bar"):
                 yield Button(
-                    "Save Creative Constraint",
+                    "Save Directorial Vision",
                     variant="primary",
-                    id="save_creative_btn",
+                    id="save_directorial_btn",
                 )
-                yield Button("Cancel", variant="default", id="cancel_creative_btn")
+                yield Button("Cancel", variant="default", id="cancel_directorial_btn")
 
     def action_cancel(self) -> None:
         self.dismiss(None)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "save_creative_btn":
+        if event.button.id == "save_directorial_btn":
             self.action_save()
-        elif event.button.id == "cancel_creative_btn":
+        elif event.button.id == "cancel_directorial_btn":
             self.action_cancel()
 
     def action_save(self) -> None:
-        name_val = self.query_one("#name", Input).value.strip() or "unnamed_creative"
+        name_val = self.query_one("#name", Input).value.strip() or "unnamed_directorial"
         desc_val = self.query_one("#description", Input).value.strip()
 
-        scenarios_raw = self.query_one("#scenarios", TextArea).text
-        scenarios_list = [x.strip() for x in scenarios_raw.splitlines() if x.strip()]
+        vis_econ = self.query_one("#visual_economy", TextArea).text
+        light_col = self.query_one("#lighting_color", TextArea).text
+        audio_land = self.query_one("#audio_landscape", TextArea).text
 
-        phil = self.query_one("#core_philosophy", TextArea).text
-        economy = self.query_one("#scene_economy", TextArea).text
-        progression = self.query_one("#progression_and_climax", TextArea).text
-        visuals = self.query_one("#visuals_and_post", TextArea).text
-
-        constraint = CreativeConstraint(
+        constraint = DirectorialVision(
             name=name_val,
             description=desc_val,
-            scenarios=scenarios_list,
-            core_philosophy=phil,
-            scene_economy=economy,
-            progression_and_climax=progression,
-            visuals_and_post=visuals,
+            visual_economy=vis_econ,
+            lighting_color=light_col,
+            audio_landscape=audio_land,
         )
 
-        save_creative_constraint(constraint)
+        save_directorial_vision(constraint)
         self.dismiss(constraint)
+
+
+class ThematicFrameworkScreen(ModalScreen[Optional[ThematicFramework]]):
+    """Interactive Modal Screen for entering or editing a Thematic Framework set."""
+
+    DEFAULT_CSS = """
+    ThematicFrameworkScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    #thematic-dialog {
+        padding: 1 2;
+        width: 85%;
+        max-width: 75;
+        height: auto;
+        max-height: 90%;
+        background: $surface;
+        border: thick $accent;
+    }
+
+    .form-field {
+        margin-bottom: 1;
+    }
+
+    .field-label {
+        color: $text;
+        text-style: bold;
+        margin-bottom: 0;
+    }
+
+    VerticalScroll {
+        height: 1fr;
+    }
+
+    TextArea {
+        height: 4;
+        margin-bottom: 1;
+    }
+
+    #button-bar {
+        margin-top: 1;
+        height: 3;
+        align: right middle;
+    }
+
+    #button-bar Button {
+        margin-left: 2;
+    }
+    """
+
+    BINDINGS = [
+        ("escape", "cancel", "Cancel"),
+    ]
+
+    def __init__(self, constraint: Optional[ThematicFramework] = None) -> None:
+        super().__init__()
+        self.constraint = constraint
+
+    def compose(self) -> ComposeResult:
+        c = self.constraint
+        with Container(id="thematic-dialog"):
+            yield Label(
+                "🧠 [bold cyan]THEMATIC FRAMEWORK SET[/bold cyan]\n", classes="title"
+            )
+            with VerticalScroll():
+                yield Label("Framework Set Name (Slug):", classes="field-label")
+                yield Input(
+                    value=c.name if c else "",
+                    placeholder="e.g. existential_dread",
+                    id="name",
+                    classes="form-field",
+                )
+
+                yield Label("Description:", classes="field-label")
+                yield Input(
+                    value=c.description if c else "",
+                    placeholder="e.g. Exploration of isolation",
+                    id="description",
+                    classes="form-field",
+                )
+
+                yield Label("Core Philosophy & Subtext:", classes="field-label")
+                yield TextArea(
+                    c.core_philosophy if c else "",
+                    id="core_philosophy",
+                )
+
+                yield Label("Emotional Arc & Trajectory:", classes="field-label")
+                yield TextArea(
+                    c.emotional_arc if c else "",
+                    id="emotional_arc",
+                )
+
+                yield Label("World Rules & Internal Logic:", classes="field-label")
+                yield TextArea(
+                    c.world_rules if c else "",
+                    id="world_rules",
+                )
+
+            with Horizontal(id="button-bar"):
+                yield Button(
+                    "Save Thematic Framework",
+                    variant="primary",
+                    id="save_thematic_btn",
+                )
+                yield Button("Cancel", variant="default", id="cancel_thematic_btn")
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "save_thematic_btn":
+            self.action_save()
+        elif event.button.id == "cancel_thematic_btn":
+            self.action_cancel()
+
+    def action_save(self) -> None:
+        name_val = self.query_one("#name", Input).value.strip() or "unnamed_thematic"
+        desc_val = self.query_one("#description", Input).value.strip()
+
+        core_phil = self.query_one("#core_philosophy", TextArea).text
+        emo_arc = self.query_one("#emotional_arc", TextArea).text
+        world_r = self.query_one("#world_rules", TextArea).text
+
+        constraint = ThematicFramework(
+            name=name_val,
+            description=desc_val,
+            core_philosophy=core_phil,
+            emotional_arc=emo_arc,
+            world_rules=world_r,
+        )
+
+        save_thematic_framework(constraint)
+        self.dismiss(constraint)
+
+
+class IdeaSeedScreen(ModalScreen[Optional[IdeaSeed]]):
+    """Interactive Modal Screen for entering or editing an Idea Seed set."""
+
+    DEFAULT_CSS = """
+    IdeaSeedScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    #idea-dialog {
+        padding: 1 2;
+        width: 85%;
+        max-width: 75;
+        height: auto;
+        max-height: 90%;
+        background: $surface;
+        border: thick $accent;
+    }
+
+    .form-field {
+        margin-bottom: 1;
+    }
+
+    .field-label {
+        color: $text;
+        text-style: bold;
+        margin-bottom: 0;
+    }
+
+    VerticalScroll {
+        height: 1fr;
+    }
+
+    TextArea {
+        height: 4;
+        margin-bottom: 1;
+    }
+
+    #button-bar {
+        margin-top: 1;
+        height: 3;
+        align: right middle;
+    }
+
+    #button-bar Button {
+        margin-left: 2;
+    }
+    """
+
+    BINDINGS = [
+        ("escape", "cancel", "Cancel"),
+    ]
+
+    def __init__(self, constraint: Optional[IdeaSeed] = None) -> None:
+        super().__init__()
+        self.constraint = constraint
+
+    def compose(self) -> ComposeResult:
+        c = self.constraint
+        with Container(id="idea-dialog"):
+            yield Label(
+                "💡 [bold green]IDEA SEED SET[/bold green]\n", classes="title"
+            )
+            with VerticalScroll():
+                yield Label("Idea Seed Name (Slug):", classes="field-label")
+                yield Input(
+                    value=c.name if c else "",
+                    placeholder="e.g. late_night_visitor",
+                    id="name",
+                    classes="form-field",
+                )
+
+                yield Label("Description:", classes="field-label")
+                yield Input(
+                    value=c.description if c else "",
+                    placeholder="e.g. Unexpected arrival scenario",
+                    id="description",
+                    classes="form-field",
+                )
+
+                yield Label("Inciting Incident / Initial Spark:", classes="field-label")
+                yield TextArea(
+                    c.inciting_incident if c else "",
+                    id="inciting_incident",
+                )
+
+                yield Label("Complications & Midpoint Twists:", classes="field-label")
+                yield TextArea(
+                    c.complications if c else "",
+                    id="complications",
+                )
+
+                yield Label("Ending Targets & Resolution Notes:", classes="field-label")
+                yield TextArea(
+                    c.ending_targets if c else "",
+                    id="ending_targets",
+                )
+
+            with Horizontal(id="button-bar"):
+                yield Button(
+                    "Save Idea Seed",
+                    variant="primary",
+                    id="save_idea_btn",
+                )
+                yield Button("Cancel", variant="default", id="cancel_idea_btn")
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "save_idea_btn":
+            self.action_save()
+        elif event.button.id == "cancel_idea_btn":
+            self.action_cancel()
+
+    def action_save(self) -> None:
+        name_val = self.query_one("#name", Input).value.strip() or "unnamed_idea"
+        desc_val = self.query_one("#description", Input).value.strip()
+
+        inc_inc = self.query_one("#inciting_incident", TextArea).text
+        comp = self.query_one("#complications", TextArea).text
+        end_t = self.query_one("#ending_targets", TextArea).text
+
+        constraint = IdeaSeed(
+            name=name_val,
+            description=desc_val,
+            inciting_incident=inc_inc,
+            complications=comp,
+            ending_targets=end_t,
+        )
+
+        save_idea_seed(constraint)
+        self.dismiss(constraint)
+

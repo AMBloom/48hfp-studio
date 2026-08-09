@@ -1,4 +1,4 @@
-"""CLI commands for managing Logistical and Creative Constraint Sets (CRUD & Active State)."""
+"""CLI commands for managing Logistical, Directorial, Thematic, and Idea Constraint Sets (CRUD & Active State)."""
 
 from typing import List, Optional
 import typer
@@ -8,25 +8,37 @@ from rich.prompt import Confirm, Prompt
 from studio.models.constraints import (
     CharacterDetail,
     ConstraintType,
-    CreativeConstraint,
+    DirectorialVision,
+    IdeaSeed,
     LogisticalConstraint,
+    ThematicFramework,
 )
 from studio.utils.constraint_store import (
-    delete_creative_constraint,
+    delete_directorial_vision,
+    delete_idea_seed,
     delete_logistical_constraint,
-    list_creative_constraints,
+    delete_thematic_framework,
+    list_directorial_visions,
+    list_idea_seeds,
     list_logistical_constraints,
-    load_creative_constraint,
+    list_thematic_frameworks,
+    load_directorial_vision,
+    load_idea_seed,
     load_logistical_constraint,
-    save_creative_constraint,
+    load_thematic_framework,
+    save_directorial_vision,
+    save_idea_seed,
     save_logistical_constraint,
+    save_thematic_framework,
     seed_default_constraints,
 )
 from studio.utils.profile_store import load_profile, save_profile
 from studio.utils.ui import (
     display_constraints_table,
-    display_creative_detail,
+    display_directorial_detail,
+    display_idea_detail,
     display_logistical_detail,
+    display_thematic_detail,
     print_banner,
     print_error,
     print_panel,
@@ -36,7 +48,7 @@ from studio.utils.ui import (
 
 constraints_app = typer.Typer(
     name="constraints",
-    help="Manage, create, edit, list, and toggle active Logistical and Creative Constraint Sets.",
+    help="Manage, create, edit, list, and toggle active constraint sets.",
     no_args_is_help=False,
 )
 console = Console()
@@ -51,29 +63,37 @@ def constraints_default(ctx: typer.Context) -> None:
 
 @constraints_app.command("list")
 def list_constraints() -> None:
-    """List all available Logistical and Creative Constraint Sets with active indicators."""
+    """List all available constraint sets with active indicators."""
     seed_default_constraints()
     prof = load_profile()
 
     active_logistical = prof.active_logistical_constraint if prof else None
-    active_creative = prof.active_creative_constraint if prof else None
+    active_directorial = prof.active_directorial_vision if prof else None
+    active_thematic = prof.active_thematic_framework if prof else None
+    active_idea = prof.active_idea_seed if prof else None
 
     logistical_sets = list_logistical_constraints()
-    creative_sets = list_creative_constraints()
+    directorial_sets = list_directorial_visions()
+    thematic_sets = list_thematic_frameworks()
+    idea_sets = list_idea_seeds()
 
     print_banner()
     display_constraints_table(
         logistical_sets=logistical_sets,
-        creative_sets=creative_sets,
+        directorial_sets=directorial_sets,
+        thematic_sets=thematic_sets,
+        idea_sets=idea_sets,
         active_logistical=active_logistical,
-        active_creative=active_creative,
+        active_directorial=active_directorial,
+        active_thematic=active_thematic,
+        active_idea=active_idea,
     )
 
 
 @constraints_app.command("create")
 def create_constraint(
     c_type: Optional[str] = typer.Option(
-        None, "--type", "-t", help="Constraint type: 'logistical' or 'creative'"
+        None, "--type", "-t", help="Constraint type: 'logistical', 'directorial', 'thematic', or 'idea'"
     ),
     name: Optional[str] = typer.Option(None, "--name", "-n", help="Unique slug name (e.g. interior_indie)"),
     description: Optional[str] = typer.Option(None, "--description", "-d", help="Brief set summary"),
@@ -81,7 +101,7 @@ def create_constraint(
         False, "--non-interactive", help="Create set non-interactively using defaults/flags"
     ),
 ) -> None:
-    """Create a new Logistical or Creative Constraint Set."""
+    """Create a new constraint set."""
     print_banner()
     console.print("[bold cyan]✨ Create New Constraint Set[/bold cyan]\n")
 
@@ -91,13 +111,13 @@ def create_constraint(
         else:
             c_type = Prompt.ask(
                 "Constraint Set Type",
-                choices=["logistical", "creative"],
+                choices=["logistical", "directorial", "thematic", "idea"],
                 default="logistical",
             )
 
     c_type_clean = c_type.strip().lower()
-    if c_type_clean not in ["logistical", "creative"]:
-        print_error("Invalid constraint type. Must be 'logistical' or 'creative'.")
+    if c_type_clean not in ["logistical", "directorial", "thematic", "idea"]:
+        print_error("Invalid constraint type. Must be 'logistical', 'directorial', 'thematic', or 'idea'.")
         raise typer.Exit(code=1)
 
     # --- Logistical Creation ---
@@ -162,80 +182,120 @@ def create_constraint(
         print_success(f"Logistical Constraint Set successfully created at [bold white]{saved_path}[/bold white]\n")
         display_logistical_detail(logistical_set, is_active=False)
 
-    # --- Creative Creation ---
-    else:
+    # --- Directorial Creation ---
+    elif c_type_clean == "directorial":
         if non_interactive:
-            set_name = name or "new_creative_set"
-            set_desc = description or "Non-interactive creative set"
-            scenarios = ["A tense encounter at dusk."]
-            philosophy = "Directorial vision emphasizing mood and subtext."
-            economy = "Balanced pacing."
-            progression = "Three-act emotional arc."
-            visuals = "Natural contrast and organic audio."
+            set_name = name or "new_directorial_vision"
+            set_desc = description or "Non-interactive directorial vision"
+            vis_econ = "Long static takes, deliberate cuts."
+            light_col = "Natural ambient light."
+            audio_land = "Subtle acoustic drones."
         else:
             set_name = name or Prompt.ask("Set Slug Name (e.g. neo_noir_thriller)")
-            set_desc = description or Prompt.ask("Set Summary/Description", default="Custom creative vision")
+            set_desc = description or Prompt.ask("Set Summary/Description", default="Custom directorial vision")
+            vis_econ = Prompt.ask("Visual Economy & Camera Movement", default="Steady handheld, long takes.")
+            light_col = Prompt.ask("Lighting Mood & Color Palette", default="High contrast neon reflections.")
+            audio_land = Prompt.ask("Audio Landscape & Music Intent", default="Pulsing synth score.")
 
-            console.print("\n[bold yellow]🎬 Story Scenarios & Philosophy[/bold yellow]")
-            sc_ans = Prompt.ask("Pre-Baked Scenario 1", default="A high-stakes trade goes wrong in secret.")
-            scenarios = [sc_ans] if sc_ans.strip() else []
-            if Confirm.ask("Add a second story scenario?"):
-                sc2 = Prompt.ask("Pre-Baked Scenario 2")
-                if sc2.strip():
-                    scenarios.append(sc2.strip())
-
-            philosophy = Prompt.ask("Core Philosophy & Thematic Spine", default="Moral ambiguity and claustrophobic choices.")
-            economy = Prompt.ask("Scene Economy & Pacing Directives", default="Quick cuts, tight close-ups, snappy dialog.")
-            progression = Prompt.ask("Progression & Climax Structure", default="Slow build-up exploding into sudden action.")
-            visuals = Prompt.ask("Visuals, Lighting & Post Guidelines", default="High contrast, neon reflections, pulsing soundtrack.")
-
-        creative_set = CreativeConstraint(
+        directorial_set = DirectorialVision(
             name=set_name,
             description=set_desc,
-            scenarios=scenarios,
-            core_philosophy=philosophy,
-            scene_economy=economy,
-            progression_and_climax=progression,
-            visuals_and_post=visuals,
+            visual_economy=vis_econ,
+            lighting_color=light_col,
+            audio_landscape=audio_land,
         )
-        saved_path = save_creative_constraint(creative_set)
-        print_success(f"Creative Constraint Set successfully created at [bold white]{saved_path}[/bold white]\n")
-        display_creative_detail(creative_set, is_active=False)
+        saved_path = save_directorial_vision(directorial_set)
+        print_success(f"Directorial Vision Set successfully created at [bold white]{saved_path}[/bold white]\n")
+        display_directorial_detail(directorial_set, is_active=False)
+
+    # --- Thematic Creation ---
+    elif c_type_clean == "thematic":
+        if non_interactive:
+            set_name = name or "new_thematic_framework"
+            set_desc = description or "Non-interactive thematic framework"
+            core_phil = "Exploration of choices."
+            emo_arc = "Escalating tension."
+            world_r = "Domestic realism."
+        else:
+            set_name = name or Prompt.ask("Set Slug Name (e.g. identity_crisis)")
+            set_desc = description or Prompt.ask("Set Summary/Description", default="Custom thematic framework")
+            core_phil = Prompt.ask("Core Philosophy & Subtext", default="Moral ambiguity and claustrophobic choices.")
+            emo_arc = Prompt.ask("Emotional Arc & Climax Dynamics", default="Quiet build-up exploding into emotional crisis.")
+            world_r = Prompt.ask("World Rules & Internal Logic", default="Strict realism where secrets have consequences.")
+
+        thematic_set = ThematicFramework(
+            name=set_name,
+            description=set_desc,
+            core_philosophy=core_phil,
+            emotional_arc=emo_arc,
+            world_rules=world_r,
+        )
+        saved_path = save_thematic_framework(thematic_set)
+        print_success(f"Thematic Framework Set successfully created at [bold white]{saved_path}[/bold white]\n")
+        display_thematic_detail(thematic_set, is_active=False)
+
+    # --- Idea Creation ---
+    else:
+        if non_interactive:
+            set_name = name or "new_idea_seed"
+            set_desc = description or "Non-interactive idea seed"
+            inc_inc = "An unexpected letter arrives."
+            comp = "A missing key causes a standoff."
+            end_t = "A quiet resolution."
+        else:
+            set_name = name or Prompt.ask("Set Slug Name (e.g. midnight_knock)")
+            set_desc = description or Prompt.ask("Set Summary/Description", default="Custom idea seed")
+            inc_inc = Prompt.ask("Inciting Incident / Initial Spark", default="An unexpected stranger knocks during a storm.")
+            comp = Prompt.ask("Complications & Midpoint Twists", default="Conflicting stories unravel trust.")
+            end_t = Prompt.ask("Ending Targets & Resolution Notes", default="A surprise reveal in the final shot.")
+
+        idea_set = IdeaSeed(
+            name=set_name,
+            description=set_desc,
+            inciting_incident=inc_inc,
+            complications=comp,
+            ending_targets=end_t,
+        )
+        saved_path = save_idea_seed(idea_set)
+        print_success(f"Idea Seed Set successfully created at [bold white]{saved_path}[/bold white]\n")
+        display_idea_detail(idea_set, is_active=False)
 
 
 @constraints_app.command("show")
 def show_constraint(
     name: str = typer.Argument(..., help="Slug name of the constraint set"),
     c_type: Optional[str] = typer.Option(
-        None, "--type", "-t", help="Constraint type: 'logistical' or 'creative'"
+        None, "--type", "-t", help="Constraint type: 'logistical', 'directorial', 'thematic', or 'idea'"
     ),
 ) -> None:
     """Display detailed view of a specific constraint set."""
     seed_default_constraints()
     prof = load_profile()
 
-    lc = None
-    cc = None
+    lc = load_logistical_constraint(name) if not c_type or c_type == "logistical" else None
+    dv = load_directorial_vision(name) if not c_type or c_type == "directorial" else None
+    tf = load_thematic_framework(name) if not c_type or c_type == "thematic" else None
+    ids = load_idea_seed(name) if not c_type or c_type == "idea" else None
 
-    if c_type:
-        clean_type = c_type.strip().lower()
-        if clean_type == "logistical":
-            lc = load_logistical_constraint(name)
-        elif clean_type == "creative":
-            cc = load_creative_constraint(name)
-    else:
-        # Auto-detect type
+    if not any([lc, dv, tf, ids]) and not c_type:
         lc = load_logistical_constraint(name)
-        if not lc:
-            cc = load_creative_constraint(name)
+        dv = load_directorial_vision(name)
+        tf = load_thematic_framework(name)
+        ids = load_idea_seed(name)
 
     print_banner()
     if lc:
-        is_active = prof and prof.active_logistical_constraint == lc.name
-        display_logistical_detail(lc, is_active=is_active)
-    elif cc:
-        is_active = prof and prof.active_creative_constraint == cc.name
-        display_creative_detail(cc, is_active=is_active)
+        is_act = prof and prof.active_logistical_constraint == lc.name
+        display_logistical_detail(lc, is_active=is_act)
+    elif dv:
+        is_act = prof and prof.active_directorial_vision == dv.name
+        display_directorial_detail(dv, is_active=is_act)
+    elif tf:
+        is_act = prof and prof.active_thematic_framework == tf.name
+        display_thematic_detail(tf, is_active=is_act)
+    elif ids:
+        is_act = prof and prof.active_idea_seed == ids.name
+        display_idea_detail(ids, is_active=is_act)
     else:
         print_error(f"Constraint set '{name}' not found.")
         raise typer.Exit(code=1)
@@ -245,59 +305,56 @@ def show_constraint(
 def edit_constraint(
     name: str = typer.Argument(..., help="Slug name of the constraint set to edit"),
     c_type: Optional[str] = typer.Option(
-        None, "--type", "-t", help="Constraint type: 'logistical' or 'creative'"
+        None, "--type", "-t", help="Constraint type: 'logistical', 'directorial', 'thematic', or 'idea'"
     ),
 ) -> None:
     """Interactively edit fields of an existing constraint set."""
     seed_default_constraints()
-    lc = None
-    cc = None
+    lc = load_logistical_constraint(name) if not c_type or c_type == "logistical" else None
+    dv = load_directorial_vision(name) if not c_type or c_type == "directorial" else None
+    tf = load_thematic_framework(name) if not c_type or c_type == "thematic" else None
+    ids = load_idea_seed(name) if not c_type or c_type == "idea" else None
 
-    if c_type:
-        clean_type = c_type.strip().lower()
-        if clean_type == "logistical":
-            lc = load_logistical_constraint(name)
-        elif clean_type == "creative":
-            cc = load_creative_constraint(name)
-    else:
+    if not any([lc, dv, tf, ids]) and not c_type:
         lc = load_logistical_constraint(name)
-        if not lc:
-            cc = load_creative_constraint(name)
+        dv = load_directorial_vision(name)
+        tf = load_thematic_framework(name)
+        ids = load_idea_seed(name)
 
     print_banner()
     if lc:
         console.print(f"[bold cyan]✏ Editing Logistical Constraint Set: {lc.name}[/bold cyan]\n")
-        new_desc = Prompt.ask("Description", default=lc.description)
-        new_locs_str = Prompt.ask("Locations (comma-separated)", default=", ".join(lc.locations))
-        new_sub_str = Prompt.ask("Sub-Locations (comma-separated)", default=", ".join(lc.sub_locations))
-        new_details = Prompt.ask("Location Details", default=lc.location_details)
-
-        lc.description = new_desc
-        lc.locations = [x.strip() for x in new_locs_str.split(",") if x.strip()]
-        lc.sub_locations = [x.strip() for x in new_sub_str.split(",") if x.strip()]
-        lc.location_details = new_details
-
+        lc.description = Prompt.ask("Description", default=lc.description)
         save_logistical_constraint(lc)
         print_success(f"Logistical Constraint Set '{lc.name}' updated!")
         display_logistical_detail(lc)
-
-    elif cc:
-        console.print(f"[bold magenta]✏ Editing Creative Constraint Set: {cc.name}[/bold magenta]\n")
-        new_desc = Prompt.ask("Description", default=cc.description)
-        new_phil = Prompt.ask("Core Philosophy", default=cc.core_philosophy)
-        new_econ = Prompt.ask("Scene Economy", default=cc.scene_economy)
-        new_prog = Prompt.ask("Progression & Climax", default=cc.progression_and_climax)
-        new_vis = Prompt.ask("Visuals & Post", default=cc.visuals_and_post)
-
-        cc.description = new_desc
-        cc.core_philosophy = new_phil
-        cc.scene_economy = new_econ
-        cc.progression_and_climax = new_prog
-        cc.visuals_and_post = new_vis
-
-        save_creative_constraint(cc)
-        print_success(f"Creative Constraint Set '{cc.name}' updated!")
-        display_creative_detail(cc)
+    elif dv:
+        console.print(f"[bold magenta]✏ Editing Directorial Vision: {dv.name}[/bold magenta]\n")
+        dv.description = Prompt.ask("Description", default=dv.description)
+        dv.visual_economy = Prompt.ask("Visual Economy", default=dv.visual_economy)
+        dv.lighting_color = Prompt.ask("Lighting & Color", default=dv.lighting_color)
+        dv.audio_landscape = Prompt.ask("Audio Landscape", default=dv.audio_landscape)
+        save_directorial_vision(dv)
+        print_success(f"Directorial Vision Set '{dv.name}' updated!")
+        display_directorial_detail(dv)
+    elif tf:
+        console.print(f"[bold blue]✏ Editing Thematic Framework: {tf.name}[/bold blue]\n")
+        tf.description = Prompt.ask("Description", default=tf.description)
+        tf.core_philosophy = Prompt.ask("Core Philosophy", default=tf.core_philosophy)
+        tf.emotional_arc = Prompt.ask("Emotional Arc", default=tf.emotional_arc)
+        tf.world_rules = Prompt.ask("World Rules", default=tf.world_rules)
+        save_thematic_framework(tf)
+        print_success(f"Thematic Framework Set '{tf.name}' updated!")
+        display_thematic_detail(tf)
+    elif ids:
+        console.print(f"[bold yellow]✏ Editing Idea Seed: {ids.name}[/bold yellow]\n")
+        ids.description = Prompt.ask("Description", default=ids.description)
+        ids.inciting_incident = Prompt.ask("Inciting Incident", default=ids.inciting_incident)
+        ids.complications = Prompt.ask("Complications", default=ids.complications)
+        ids.ending_targets = Prompt.ask("Ending Targets", default=ids.ending_targets)
+        save_idea_seed(ids)
+        print_success(f"Idea Seed Set '{ids.name}' updated!")
+        display_idea_detail(ids)
     else:
         print_error(f"Constraint set '{name}' not found.")
         raise typer.Exit(code=1)
@@ -307,23 +364,27 @@ def edit_constraint(
 def delete_constraint(
     name: str = typer.Argument(..., help="Slug name of the constraint set to delete"),
     c_type: Optional[str] = typer.Option(
-        None, "--type", "-t", help="Constraint type: 'logistical' or 'creative'"
+        None, "--type", "-t", help="Constraint type: 'logistical', 'directorial', 'thematic', or 'idea'"
     ),
     force: bool = typer.Option(False, "--force", "-f", help="Force deletion without confirmation prompt"),
 ) -> None:
     """Delete a constraint set by name."""
-    lc = load_logistical_constraint(name) if (not c_type or c_type.lower() == "logistical") else None
-    cc = load_creative_constraint(name) if (not c_type or c_type.lower() == "creative") else None
+    lc = load_logistical_constraint(name) if not c_type or c_type == "logistical" else None
+    dv = load_directorial_vision(name) if not c_type or c_type == "directorial" else None
+    tf = load_thematic_framework(name) if not c_type or c_type == "thematic" else None
+    ids = load_idea_seed(name) if not c_type or c_type == "idea" else None
 
-    if not lc and not cc and not c_type:
-        # Fallback search if c_type was specified as creative or auto-search
-        cc = load_creative_constraint(name)
+    if not any([lc, dv, tf, ids]) and not c_type:
+        lc = load_logistical_constraint(name)
+        dv = load_directorial_vision(name)
+        tf = load_thematic_framework(name)
+        ids = load_idea_seed(name)
 
-    if not lc and not cc:
+    if not any([lc, dv, tf, ids]):
         print_error(f"Constraint set '{name}' not found.")
         raise typer.Exit(code=1)
 
-    target_type = "logistical" if lc else "creative"
+    target_type = "logistical" if lc else "directorial" if dv else "thematic" if tf else "idea"
 
     if not force:
         if not Confirm.ask(f"Are you sure you want to delete the {target_type} set '{name}'?"):
@@ -331,15 +392,26 @@ def delete_constraint(
             return
 
     prof = load_profile()
+    deleted = False
     if target_type == "logistical":
         deleted = delete_logistical_constraint(name)
         if prof and prof.active_logistical_constraint == name:
             prof.active_logistical_constraint = None
             save_profile(prof)
-    else:
-        deleted = delete_creative_constraint(name)
-        if prof and prof.active_creative_constraint == name:
-            prof.active_creative_constraint = None
+    elif target_type == "directorial":
+        deleted = delete_directorial_vision(name)
+        if prof and prof.active_directorial_vision == name:
+            prof.active_directorial_vision = None
+            save_profile(prof)
+    elif target_type == "thematic":
+        deleted = delete_thematic_framework(name)
+        if prof and prof.active_thematic_framework == name:
+            prof.active_thematic_framework = None
+            save_profile(prof)
+    elif target_type == "idea":
+        deleted = delete_idea_seed(name)
+        if prof and prof.active_idea_seed == name:
+            prof.active_idea_seed = None
             save_profile(prof)
 
     if deleted:
@@ -351,9 +423,11 @@ def delete_constraint(
 @constraints_app.command("set-active")
 def set_active_constraints(
     logistical: Optional[str] = typer.Option(None, "--logistical", "-l", help="Name of logistical set to activate"),
-    creative: Optional[str] = typer.Option(None, "--creative", "-c", help="Name of creative set to activate"),
+    directorial: Optional[str] = typer.Option(None, "--directorial", "-d", help="Name of directorial vision to activate"),
+    thematic: Optional[str] = typer.Option(None, "--thematic", "-t", help="Name of thematic framework to activate"),
+    idea: Optional[str] = typer.Option(None, "--idea", "-i", help="Name of idea seed to activate"),
 ) -> None:
-    """Set which Logistical and/or Creative Constraint Sets are active for generation."""
+    """Set which constraint sets are active for generation."""
     seed_default_constraints()
     prof = load_profile()
 
@@ -361,9 +435,8 @@ def set_active_constraints(
         print_error("No global team profile found. Run '48hfp config setup' first.")
         raise typer.Exit(code=1)
 
-    if not logistical and not creative:
-        print_warning("No constraint set specified. Provide --logistical and/or --creative options.")
-        console.print("Example: [bold cyan]48hfp constraints set-active --logistical interior_indie_crew --creative a24_slow_burn[/bold cyan]")
+    if not any([logistical, directorial, thematic, idea]):
+        print_warning("No constraint set specified.")
         raise typer.Exit(code=1)
 
     print_banner()
@@ -376,13 +449,29 @@ def set_active_constraints(
         prof.active_logistical_constraint = lc.name
         print_success(f"Active Logistical Constraint Set updated to: [bold cyan]{lc.name}[/bold cyan]")
 
-    if creative:
-        cc = load_creative_constraint(creative)
-        if not cc:
-            print_error(f"Creative constraint set '{creative}' not found.")
+    if directorial:
+        dv = load_directorial_vision(directorial)
+        if not dv:
+            print_error(f"Directorial vision set '{directorial}' not found.")
             raise typer.Exit(code=1)
-        prof.active_creative_constraint = cc.name
-        print_success(f"Active Creative Constraint Set updated to: [bold magenta]{cc.name}[/bold magenta]")
+        prof.active_directorial_vision = dv.name
+        print_success(f"Active Directorial Vision updated to: [bold magenta]{dv.name}[/bold magenta]")
+
+    if thematic:
+        tf = load_thematic_framework(thematic)
+        if not tf:
+            print_error(f"Thematic framework set '{thematic}' not found.")
+            raise typer.Exit(code=1)
+        prof.active_thematic_framework = tf.name
+        print_success(f"Active Thematic Framework updated to: [bold blue]{tf.name}[/bold blue]")
+
+    if idea:
+        ids = load_idea_seed(idea)
+        if not ids:
+            print_error(f"Idea seed set '{idea}' not found.")
+            raise typer.Exit(code=1)
+        prof.active_idea_seed = ids.name
+        print_success(f"Active Idea Seed updated to: [bold green]{ids.name}[/bold green]")
 
     save_profile(prof)
     console.print()
@@ -391,30 +480,43 @@ def set_active_constraints(
 
 @constraints_app.command("show-active")
 def show_active() -> None:
-    """Display currently primed active Logistical and Creative constraint sets."""
+    """Display currently primed active constraint sets."""
     seed_default_constraints()
     prof = load_profile()
 
     print_banner()
 
-    active_log_name = prof.active_logistical_constraint if prof else None
-    active_cre_name = prof.active_creative_constraint if prof else None
+    log_name = prof.active_logistical_constraint if prof else None
+    dir_name = prof.active_directorial_vision if prof else None
+    them_name = prof.active_thematic_framework if prof else None
+    idea_name = prof.active_idea_seed if prof else None
 
-    lc = load_logistical_constraint(active_log_name) if active_log_name else None
-    cc = load_creative_constraint(active_cre_name) if active_cre_name else None
+    lc = load_logistical_constraint(log_name) if log_name else None
+    dv = load_directorial_vision(dir_name) if dir_name else None
+    tf = load_thematic_framework(them_name) if them_name else None
+    ids = load_idea_seed(idea_name) if idea_name else None
 
     log_status = f"[bold cyan]{lc.name}[/bold cyan]" if lc else "[yellow]None selected[/yellow]"
-    cre_status = f"[bold magenta]{cc.name}[/bold magenta]" if cc else "[yellow]None selected[/yellow]"
+    dir_status = f"[bold magenta]{dv.name}[/bold magenta]" if dv else "[yellow]None selected[/yellow]"
+    them_status = f"[bold blue]{tf.name}[/bold blue]" if tf else "[yellow]None selected[/yellow]"
+    idea_status = f"[bold green]{ids.name}[/bold green]" if ids else "[yellow]None selected[/yellow]"
 
     content = (
         f"[bold white]Primed Generation Context[/bold white]\n\n"
         f"🚚 Active Logistical Set: {log_status}\n"
-        f"🎨 Active Creative Set: {cre_status}\n"
+        f"🎬 Active Directorial Vision: {dir_status}\n"
+        f"🧠 Active Thematic Framework: {them_status}\n"
+        f"💡 Active Idea Seed: {idea_status}\n"
     )
 
     print_panel(content=content, title="⚡ Primed Active Constraint Sets", border_style="green")
 
     if lc:
         display_logistical_detail(lc, is_active=True)
-    if cc:
-        display_creative_detail(cc, is_active=True)
+    if dv:
+        display_directorial_detail(dv, is_active=True)
+    if tf:
+        display_thematic_detail(tf, is_active=True)
+    if ids:
+        display_idea_detail(ids, is_active=True)
+

@@ -10,22 +10,17 @@ sub_locations:
 - Kitchen
 - Hallway
 - Balcony
-location_details: Natural daylight through living room windows. Kitchen equipped with
-  island counter and fluorescent overheads.
-main_character_details:
-  name: Protagonist
-  actor_traits: Late 20s - Early 30s, expressive eyes, casual clothing
-  wardrobe: Faded denim jacket, graphic tee, sneakers
-  notes: Resourceful but anxious under pressure
+location_details: Natural daylight Whaslls are whitethrouWgh living room windows.
+  Kitchen equipped with island counter and fluorescent overheads.
 other_characters:
 - name: Eclectic Neighbor
   actor_traits: 40s, eccentric posture, loud voice
   wardrobe: Bright bathrobe or oversized vintage cardigan
   notes: Provides unexpected plot exposition
-props_and_dialogue:
+available_set_dressing:
 - Vintage coffee mug
 - Flickering table lamp
 - Unopened letter on kitchen counter
 - 'Running Joke: ''Did anyone actually remember the coffee?'''
-created_at: '2026-08-06T22:46:17.784414'
-updated_at: '2026-08-06T22:46:17.784501'
+created_at: '2026-08-08T16:00:18.278609'
+updated_at: '2026-08-08T16:00:18.279552'

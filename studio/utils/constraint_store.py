@@ -1,4 +1,4 @@
-"""Storage utility for Logistical and Creative Constraint Sets using PyYAML."""
+"""Storage utility for Logistical, Directorial, Thematic, and Idea Constraint Sets using PyYAML."""
 
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -7,8 +7,10 @@ import yaml
 from studio.models.constraints import (
     CharacterDetail,
     ConstraintType,
-    CreativeConstraint,
+    DirectorialVision,
+    IdeaSeed,
     LogisticalConstraint,
+    ThematicFramework,
 )
 
 
@@ -22,15 +24,27 @@ def get_logistical_dir() -> Path:
     return get_constraints_base_dir() / "logistical"
 
 
-def get_creative_dir() -> Path:
-    """Return creative constraints directory path."""
-    return get_constraints_base_dir() / "creative"
+def get_directorial_dir() -> Path:
+    """Return directorial vision constraints directory path."""
+    return get_constraints_base_dir() / "directorial"
+
+
+def get_thematic_dir() -> Path:
+    """Return thematic framework constraints directory path."""
+    return get_constraints_base_dir() / "thematic"
+
+
+def get_ideas_dir() -> Path:
+    """Return idea seeds constraints directory path."""
+    return get_constraints_base_dir() / "ideas"
 
 
 def ensure_constraints_dirs() -> None:
     """Ensure constraint directories exist."""
     get_logistical_dir().mkdir(parents=True, exist_ok=True)
-    get_creative_dir().mkdir(parents=True, exist_ok=True)
+    get_directorial_dir().mkdir(parents=True, exist_ok=True)
+    get_thematic_dir().mkdir(parents=True, exist_ok=True)
+    get_ideas_dir().mkdir(parents=True, exist_ok=True)
 
 
 # --- Logistical Constraints ---
@@ -84,24 +98,24 @@ def delete_logistical_constraint(name: str) -> bool:
     return False
 
 
-# --- Creative Constraints ---
+# --- Directorial Vision Constraints ---
 
 
-def save_creative_constraint(constraint: CreativeConstraint) -> Path:
-    """Save a CreativeConstraint object to YAML."""
+def save_directorial_vision(constraint: DirectorialVision) -> Path:
+    """Save a DirectorialVision object to YAML."""
     ensure_constraints_dirs()
     constraint.update_timestamp()
-    file_path = get_creative_dir() / f"{constraint.name}.yaml"
+    file_path = get_directorial_dir() / f"{constraint.name}.yaml"
     data = constraint.model_dump()
     with open(file_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
     return file_path
 
 
-def load_creative_constraint(name: str) -> Optional[CreativeConstraint]:
-    """Load a CreativeConstraint object by set name slug."""
+def load_directorial_vision(name: str) -> Optional[DirectorialVision]:
+    """Load a DirectorialVision object by set name slug."""
     slug = name.strip().lower().replace(" ", "_")
-    file_path = get_creative_dir() / f"{slug}.yaml"
+    file_path = get_directorial_dir() / f"{slug}.yaml"
     if not file_path.exists():
         return None
     try:
@@ -109,26 +123,128 @@ def load_creative_constraint(name: str) -> Optional[CreativeConstraint]:
             data = yaml.safe_load(f)
         if not data or not isinstance(data, dict):
             return None
-        return CreativeConstraint.model_validate(data)
+        return DirectorialVision.model_validate(data)
     except Exception:
         return None
 
 
-def list_creative_constraints() -> List[CreativeConstraint]:
-    """List all available CreativeConstraint sets."""
+def list_directorial_visions() -> List[DirectorialVision]:
+    """List all available DirectorialVision sets."""
     ensure_constraints_dirs()
-    results: List[CreativeConstraint] = []
-    for file_path in sorted(get_creative_dir().glob("*.yaml")):
-        c = load_creative_constraint(file_path.stem)
+    results: List[DirectorialVision] = []
+    for file_path in sorted(get_directorial_dir().glob("*.yaml")):
+        c = load_directorial_vision(file_path.stem)
         if c:
             results.append(c)
     return results
 
 
-def delete_creative_constraint(name: str) -> bool:
-    """Delete a CreativeConstraint set file by name."""
+def delete_directorial_vision(name: str) -> bool:
+    """Delete a DirectorialVision set file by name."""
     slug = name.strip().lower().replace(" ", "_")
-    file_path = get_creative_dir() / f"{slug}.yaml"
+    file_path = get_directorial_dir() / f"{slug}.yaml"
+    if file_path.exists():
+        file_path.unlink()
+        return True
+    return False
+
+
+# --- Thematic Framework Constraints ---
+
+
+def save_thematic_framework(constraint: ThematicFramework) -> Path:
+    """Save a ThematicFramework object to YAML."""
+    ensure_constraints_dirs()
+    constraint.update_timestamp()
+    file_path = get_thematic_dir() / f"{constraint.name}.yaml"
+    data = constraint.model_dump()
+    with open(file_path, "w", encoding="utf-8") as f:
+        yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    return file_path
+
+
+def load_thematic_framework(name: str) -> Optional[ThematicFramework]:
+    """Load a ThematicFramework object by set name slug."""
+    slug = name.strip().lower().replace(" ", "_")
+    file_path = get_thematic_dir() / f"{slug}.yaml"
+    if not file_path.exists():
+        return None
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        if not data or not isinstance(data, dict):
+            return None
+        return ThematicFramework.model_validate(data)
+    except Exception:
+        return None
+
+
+def list_thematic_frameworks() -> List[ThematicFramework]:
+    """List all available ThematicFramework sets."""
+    ensure_constraints_dirs()
+    results: List[ThematicFramework] = []
+    for file_path in sorted(get_thematic_dir().glob("*.yaml")):
+        c = load_thematic_framework(file_path.stem)
+        if c:
+            results.append(c)
+    return results
+
+
+def delete_thematic_framework(name: str) -> bool:
+    """Delete a ThematicFramework set file by name."""
+    slug = name.strip().lower().replace(" ", "_")
+    file_path = get_thematic_dir() / f"{slug}.yaml"
+    if file_path.exists():
+        file_path.unlink()
+        return True
+    return False
+
+
+# --- Idea Seed Constraints ---
+
+
+def save_idea_seed(constraint: IdeaSeed) -> Path:
+    """Save an IdeaSeed object to YAML."""
+    ensure_constraints_dirs()
+    constraint.update_timestamp()
+    file_path = get_ideas_dir() / f"{constraint.name}.yaml"
+    data = constraint.model_dump()
+    with open(file_path, "w", encoding="utf-8") as f:
+        yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    return file_path
+
+
+def load_idea_seed(name: str) -> Optional[IdeaSeed]:
+    """Load an IdeaSeed object by set name slug."""
+    slug = name.strip().lower().replace(" ", "_")
+    file_path = get_ideas_dir() / f"{slug}.yaml"
+    if not file_path.exists():
+        return None
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        if not data or not isinstance(data, dict):
+            return None
+        return IdeaSeed.model_validate(data)
+    except Exception:
+        return None
+
+
+def list_idea_seeds() -> List[IdeaSeed]:
+    """List all available IdeaSeed sets."""
+    ensure_constraints_dirs()
+    results: List[IdeaSeed] = []
+    for file_path in sorted(get_ideas_dir().glob("*.yaml")):
+        c = load_idea_seed(file_path.stem)
+        if c:
+            results.append(c)
+    return results
+
+
+def delete_idea_seed(name: str) -> bool:
+    """Delete an IdeaSeed set file by name."""
+    slug = name.strip().lower().replace(" ", "_")
+    file_path = get_ideas_dir() / f"{slug}.yaml"
     if file_path.exists():
         file_path.unlink()
         return True
@@ -138,11 +254,13 @@ def delete_creative_constraint(name: str) -> bool:
 # --- Seeding Defaults ---
 
 
-def seed_default_constraints() -> Tuple[Optional[Path], Optional[Path]]:
-    """Seed default starter logistical and creative constraint sets if none exist."""
+def seed_default_constraints() -> Tuple[Optional[Path], Optional[Path], Optional[Path], Optional[Path]]:
+    """Seed default starter constraint sets for all categories if none exist."""
     ensure_constraints_dirs()
     logistical_path = None
-    creative_path = None
+    directorial_path = None
+    thematic_path = None
+    ideas_path = None
 
     if not list_logistical_constraints():
         default_logistical = LogisticalConstraint(
@@ -174,19 +292,35 @@ def seed_default_constraints() -> Tuple[Optional[Path], Optional[Path]]:
         )
         logistical_path = save_logistical_constraint(default_logistical)
 
-    if not list_creative_constraints():
-        default_creative = CreativeConstraint(
+    if not list_directorial_visions():
+        default_directorial = DirectorialVision(
             name="a24_slow_burn",
             description="A24-style indie psychological drama with deliberate pacing and lingering shots.",
-            scenarios=[
-                "Two long-lost friends reunite under suspicious circumstances during a power outage.",
-                "A tense dinner party where unspoken secrets gradually unravel.",
-            ],
-            core_philosophy="Tension through silence, spatial intimacy, and understated subtext.",
-            scene_economy="Long static takes, minimal cuts, letting dialogue breath with natural pauses.",
-            progression_and_climax="Subtle character escalation building to a quiet, high-stakes emotional confrontation.",
-            visuals_and_post="Desaturated warm tones, soft directional lighting, ambient acoustic score with subtle synth drones.",
+            visual_economy="Long static takes, minimal cuts, letting dialogue breath with natural pauses.",
+            lighting_color="Desaturated warm tones, soft directional lighting, moody shadows.",
+            audio_landscape="Ambient acoustic score with subtle synth drones and naturalistic room tone.",
         )
-        creative_path = save_creative_constraint(default_creative)
+        directorial_path = save_directorial_vision(default_directorial)
 
-    return logistical_path, creative_path
+    if not list_thematic_frameworks():
+        default_thematic = ThematicFramework(
+            name="existential_dread",
+            description="Explores human isolation, fragile connections, and unspoken secrets.",
+            core_philosophy="Tension through silence, spatial intimacy, and understated subtext.",
+            emotional_arc="Subtle character escalation building to a quiet, high-stakes emotional confrontation.",
+            world_rules="Claustrophobic domestic realism where small daily choices carry overwhelming weight.",
+        )
+        thematic_path = save_thematic_framework(default_thematic)
+
+    if not list_idea_seeds():
+        default_idea = IdeaSeed(
+            name="late_night_visitor",
+            description="An unexpected arrival disrupts a fragile quiet night.",
+            inciting_incident="Two long-lost acquaintances reunite under suspicious circumstances during a citywide power outage.",
+            complications="A lost key, hidden motives, and a sudden knock at the back door.",
+            ending_targets="A tense standoff resolving in an unexpected gesture of forgiveness.",
+        )
+        ideas_path = save_idea_seed(default_idea)
+
+    return logistical_path, directorial_path, thematic_path, ideas_path
+

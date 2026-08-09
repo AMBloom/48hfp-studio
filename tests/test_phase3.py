@@ -98,11 +98,13 @@ def test_prompt_builder_hierarchy_and_recency_effect():
     # Check key sections are present
     assert "SYSTEM PERSONA DIRECTIVE" in compiled
     assert "1. GLOBAL PRODUCTION TEAM STATE & RESOURCES" in compiled
-    assert "2. ACTIVE CREATIVE CONSTRAINT SET" in compiled
-    assert "3. ACTIVE LOGISTICAL CONSTRAINT SET" in compiled
-    assert "4. OUTPUT FORMATTING & TREATMENT SCHEMA DIRECTIVES" in compiled
-    assert "5. THE FRIDAY NIGHT DRAW (KICKOFF INPUT DATA)" in compiled
-    assert "6. IMMUTABLE FESTIVAL RULES (STRICT COMPLIANCE MANDATE - RECENCY EFFECT)" in compiled
+    assert "2. ACTIVE DIRECTORIAL VISION" in compiled
+    assert "3. ACTIVE THEMATIC FRAMEWORK" in compiled
+    assert "4. ACTIVE IDEA SEED" in compiled
+    assert "5. ACTIVE LOGISTICAL CONSTRAINT SET" in compiled
+    assert "6. OUTPUT FORMATTING & TREATMENT SCHEMA DIRECTIVES" in compiled
+    assert "7. THE FRIDAY NIGHT DRAW (KICKOFF INPUT DATA)" in compiled
+    assert "8. IMMUTABLE FESTIVAL RULES (STRICT COMPLIANCE MANDATE - RECENCY EFFECT)" in compiled
 
     # Verify Recency Effect: Immutable rules are at the very bottom
     sections = compiled.split("================================================================================\n")

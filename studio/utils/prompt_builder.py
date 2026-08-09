@@ -6,12 +6,19 @@ Immutable Festival Rules at the absolute bottom of the system prompt.
 
 from typing import Optional
 
-from studio.models.constraints import CreativeConstraint, LogisticalConstraint
+from studio.models.constraints import (
+    DirectorialVision,
+    IdeaSeed,
+    LogisticalConstraint,
+    ThematicFramework,
+)
 from studio.models.draw import FridayDraw
 from studio.models.profile import TeamProfile
 from studio.utils.constraint_store import (
-    load_creative_constraint,
+    load_directorial_vision,
+    load_idea_seed,
     load_logistical_constraint,
+    load_thematic_framework,
 )
 from studio.utils.draw_store import load_draw
 from studio.utils.profile_store import load_profile
@@ -26,18 +33,24 @@ class PromptBuilder:
         draw: Optional[FridayDraw] = None,
         profile: Optional[TeamProfile] = None,
         logistical: Optional[LogisticalConstraint] = None,
-        creative: Optional[CreativeConstraint] = None,
+        directorial: Optional[DirectorialVision] = None,
+        thematic: Optional[ThematicFramework] = None,
+        idea: Optional[IdeaSeed] = None,
+        additional_instructions: Optional[str] = None,
     ) -> str:
         """Compile and return the complete hierarchical system prompt string.
 
         Hierarchy:
         1. System Persona Directive
         2. Global Team State
-        3. Active Creative Constraints
-        4. Active Logistical Constraints
-        5. Output Schema Directives
-        6. Friday Night Draw Kickoff Input
-        7. Immutable Festival Rules (Recency Effect - Absolute Bottom)
+        3. Active Directorial Vision
+        4. Active Thematic Framework
+        5. Active Idea Seed
+        6. Active Logistical Constraints
+        7. Additional Filmmaker Directives (Optional - Omitted if empty)
+        8. Output Schema Directives
+        9. Friday Night Draw Kickoff Input
+        10. Immutable Festival Rules (Recency Effect - Absolute Bottom)
         """
         # Resolve inputs from store if not provided
         final_profile = profile or load_profile()
@@ -46,8 +59,14 @@ class PromptBuilder:
         if logistical is None and final_profile and final_profile.active_logistical_constraint:
             logistical = load_logistical_constraint(final_profile.active_logistical_constraint)
 
-        if creative is None and final_profile and final_profile.active_creative_constraint:
-            creative = load_creative_constraint(final_profile.active_creative_constraint)
+        if directorial is None and final_profile and final_profile.active_directorial_vision:
+            directorial = load_directorial_vision(final_profile.active_directorial_vision)
+
+        if thematic is None and final_profile and final_profile.active_thematic_framework:
+            thematic = load_thematic_framework(final_profile.active_thematic_framework)
+
+        if idea is None and final_profile and final_profile.active_idea_seed:
+            idea = load_idea_seed(final_profile.active_idea_seed)
 
         sections = []
 
@@ -57,19 +76,30 @@ class PromptBuilder:
         # 2. Global Team State
         sections.append(cls._build_global_state_section(final_profile))
 
-        # 3. Active Creative Constraints
-        sections.append(cls._build_creative_section(creative))
+        # 3. Active Directorial Vision
+        sections.append(cls._build_directorial_section(directorial))
 
-        # 4. Active Logistical Constraints
+        # 4. Active Thematic Framework
+        sections.append(cls._build_thematic_section(thematic))
+
+        # 5. Active Idea Seed
+        sections.append(cls._build_idea_section(idea))
+
+        # 6. Active Logistical Constraints
         sections.append(cls._build_logistical_section(logistical))
 
-        # 5. Output Schema Directives
+        # 7. Additional Directives (Omitted if empty)
+        add_directives_section = cls._build_additional_directives_section(additional_instructions)
+        if add_directives_section:
+            sections.append(add_directives_section)
+
+        # 8. Output Schema Directives
         sections.append(cls._build_schema_section())
 
-        # 6. Friday Night Draw Input
+        # 9. Friday Night Draw Input
         sections.append(cls._build_draw_section(final_draw))
 
-        # 7. Immutable Festival Rules (The Recency Effect - Placed at absolute bottom)
+        # 10. Immutable Festival Rules (The Recency Effect - Placed at absolute bottom)
         sections.append(cls._build_immutable_rules_section(final_draw))
 
         return "\n\n".join(sections)
@@ -109,14 +139,28 @@ class PromptBuilder:
             f"Production Team Name: {profile.team_name}",
             f"Team Administrator: {profile.admin_username}",
             f"Production Location: {profile.location}",
-            "Available Team Roster & Roles:",
+            "Available Crew Roster & Roles:",
         ]
-        if profile.roles:
-            for role, members in profile.roles.items():
+        crew_dict = profile.crew or profile.roles or {}
+        if crew_dict:
+            for role, members in crew_dict.items():
                 m_str = ", ".join(members) if members else "None assigned"
                 lines.append(f"  • {role}: {m_str}")
         else:
-            lines.append("  • No specific role assignments provided.")
+            lines.append("  • No specific crew role assignments provided.")
+
+        if profile.cast:
+            lines.append("Available Cast Roster:")
+            for actor in profile.cast:
+                lines.append(
+                    f"  • {actor.get('name', 'Actor')}: Age {actor.get('age_range', 'N/A')}, "
+                    f"Gender: {actor.get('gender', 'N/A')}, Physicality: {actor.get('physicality', 'N/A')}"
+                )
+
+        if profile.available_gear:
+            lines.append("Available Equipment & Gear Catalog:")
+            for g in profile.available_gear:
+                lines.append(f"  • {g}")
 
         if profile.custom_details and profile.custom_details.strip():
             lines.append(f"Custom Equipment & Logistics Notes:\n  {profile.custom_details.strip()}")
@@ -126,36 +170,67 @@ class PromptBuilder:
         return header + "\n".join(lines)
 
     @staticmethod
-    def _build_creative_section(creative: Optional[CreativeConstraint]) -> str:
+    def _build_directorial_section(directorial: Optional[DirectorialVision]) -> str:
         header = (
             "================================================================================\n"
-            "2. ACTIVE CREATIVE CONSTRAINT SET (DIRECTORIAL VISION)\n"
+            "2. ACTIVE DIRECTORIAL VISION (VISUAL & AUDIO STYLE)\n"
             "================================================================================\n"
         )
-        if not creative:
-            return header + "Active Set: [None Primed - Apply flexible narrative guidelines]"
+        if not directorial:
+            return header + "Active Vision: [None Primed - Apply versatile cinematic visual directives]"
 
         lines = [
-            f"Set Name: {creative.name}",
-            f"Description: {creative.description or 'N/A'}",
+            f"Vision Name: {directorial.name}",
+            f"Description: {directorial.description or 'N/A'}",
+            f"Visual Economy & Camera Movement:\n  {directorial.visual_economy or 'N/A'}",
+            f"Lighting & Color Grading Intent:\n  {directorial.lighting_color or 'N/A'}",
+            f"Audio Landscape & Music Intent:\n  {directorial.audio_landscape or 'N/A'}",
         ]
-        if creative.scenarios:
-            lines.append("Pre-Baked Story Scenarios / Concepts:")
-            for idx, sc in enumerate(creative.scenarios, 1):
-                lines.append(f"  {idx}. {sc}")
+        return header + "\n".join(lines)
 
-        lines.append(f"Core Philosophy & Motivation:\n  {creative.core_philosophy or 'N/A'}")
-        lines.append(f"Scene Economy & Pacing:\n  {creative.scene_economy or 'N/A'}")
-        lines.append(f"Progression & Climax Structure:\n  {creative.progression_and_climax or 'N/A'}")
-        lines.append(f"Visuals & Post-Production Guidelines:\n  {creative.visuals_and_post or 'N/A'}")
+    @staticmethod
+    def _build_thematic_section(thematic: Optional[ThematicFramework]) -> str:
+        header = (
+            "================================================================================\n"
+            "3. ACTIVE THEMATIC FRAMEWORK (CORE PHILOSOPHY & EMOTIONAL ARC)\n"
+            "================================================================================\n"
+        )
+        if not thematic:
+            return header + "Active Framework: [None Primed - Apply flexible dramatic thematic spine]"
 
+        lines = [
+            f"Framework Name: {thematic.name}",
+            f"Description: {thematic.description or 'N/A'}",
+            f"Core Philosophy & Subtext:\n  {thematic.core_philosophy or 'N/A'}",
+            f"Emotional Arc & Climax Dynamics:\n  {thematic.emotional_arc or 'N/A'}",
+            f"World Rules & Atmospheric Logic:\n  {thematic.world_rules or 'N/A'}",
+        ]
+        return header + "\n".join(lines)
+
+    @staticmethod
+    def _build_idea_section(idea: Optional[IdeaSeed]) -> str:
+        header = (
+            "================================================================================\n"
+            "4. ACTIVE IDEA SEED (NARRATIVE SPARK & SCENARIO)\n"
+            "================================================================================\n"
+        )
+        if not idea:
+            return header + "Active Seed: [None Primed - Generate original scenario tailored to draw]"
+
+        lines = [
+            f"Seed Name: {idea.name}",
+            f"Description: {idea.description or 'N/A'}",
+            f"Inciting Incident / Initial Spark:\n  {idea.inciting_incident or 'N/A'}",
+            f"Complications & Midpoint Twists:\n  {idea.complications or 'N/A'}",
+            f"Ending Targets & Resolution Notes:\n  {idea.ending_targets or 'N/A'}",
+        ]
         return header + "\n".join(lines)
 
     @staticmethod
     def _build_logistical_section(logistical: Optional[LogisticalConstraint]) -> str:
         header = (
             "================================================================================\n"
-            "3. ACTIVE LOGISTICAL CONSTRAINT SET (SHOOT REALITY & PHYSICAL ASSETS)\n"
+            "5. ACTIVE LOGISTICAL CONSTRAINT SET (SHOOT REALITY & PHYSICAL ASSETS)\n"
             "================================================================================\n"
         )
         if not logistical:
@@ -169,27 +244,35 @@ class PromptBuilder:
             f"Location Layout & Lighting Details:\n  {logistical.location_details or 'N/A'}",
         ]
 
-        if logistical.main_character_details:
-            mc = logistical.main_character_details
-            lines.append(f"Main Character Actor Extension:\n  Name: {mc.name} | Traits: {mc.actor_traits or 'N/A'} | Wardrobe: {mc.wardrobe or 'N/A'} | Notes: {mc.notes or 'N/A'}")
-
         if logistical.other_characters:
             lines.append("Additional Available Cast Roster:")
             for char in logistical.other_characters:
                 lines.append(f"  • {char.name}: {char.actor_traits or 'No traits'} (Wardrobe: {char.wardrobe or 'N/A'})")
 
-        if logistical.props_and_dialogue:
-            lines.append("Available Physical Props & Dialogue Hooks:")
-            for item in logistical.props_and_dialogue:
+        dressing = logistical.available_set_dressing
+        if dressing:
+            lines.append("Available Set Dressing, Wardrobe & Dialogue Hooks:")
+            for item in dressing:
                 lines.append(f"  • {item}")
 
         return header + "\n".join(lines)
 
     @staticmethod
+    def _build_additional_directives_section(additional_instructions: Optional[str]) -> Optional[str]:
+        if not additional_instructions or not additional_instructions.strip():
+            return None
+        return (
+            "================================================================================\n"
+            "ADDITIONAL FILMMAKER DIRECTIVES\n"
+            "================================================================================\n"
+            f"{additional_instructions.strip()}"
+        )
+
+    @staticmethod
     def _build_schema_section() -> str:
         return (
             "================================================================================\n"
-            "4. OUTPUT FORMATTING & TREATMENT SCHEMA DIRECTIVES\n"
+            "6. OUTPUT FORMATTING & TREATMENT SCHEMA DIRECTIVES\n"
             "================================================================================\n"
             "Your output script treatment MUST be structured in clean Markdown with the following headers:\n\n"
             "1. # FILM TITLE & LOGLINE\n"
@@ -214,7 +297,7 @@ class PromptBuilder:
     def _build_draw_section(draw: Optional[FridayDraw]) -> str:
         header = (
             "================================================================================\n"
-            "5. THE FRIDAY NIGHT DRAW (KICKOFF INPUT DATA)\n"
+            "7. THE FRIDAY NIGHT DRAW (KICKOFF INPUT DATA)\n"
             "================================================================================\n"
         )
         if not draw:
@@ -238,7 +321,7 @@ class PromptBuilder:
 
         return (
             "================================================================================\n"
-            "6. IMMUTABLE FESTIVAL RULES (STRICT COMPLIANCE MANDATE - RECENCY EFFECT)\n"
+            "8. IMMUTABLE FESTIVAL RULES (STRICT COMPLIANCE MANDATE - RECENCY EFFECT)\n"
             "================================================================================\n"
             "CRITICAL: The following rules are IMMUTABLE and ANCHORED at the bottom of this prompt.\n"
             "Due to The Recency Effect, you MUST prioritize these mandates above all other creative directives:\n\n"
@@ -258,3 +341,4 @@ class PromptBuilder:
             "   • The character MUST physically appear on screen (their name does not need to be spoken aloud).\n"
             "================================================================================"
         )
+

@@ -167,9 +167,19 @@ def info() -> None:
             if prof and prof.active_logistical_constraint
             else "[yellow]None[/yellow]"
         )
-        active_cre = (
-            prof.active_creative_constraint
-            if prof and prof.active_creative_constraint
+        active_dir = (
+            prof.active_directorial_vision
+            if prof and prof.active_directorial_vision
+            else "[yellow]None[/yellow]"
+        )
+        active_them = (
+            prof.active_thematic_framework
+            if prof and prof.active_thematic_framework
+            else "[yellow]None[/yellow]"
+        )
+        active_idea = (
+            prof.active_idea_seed
+            if prof and prof.active_idea_seed
             else "[yellow]None[/yellow]"
         )
 
@@ -179,7 +189,9 @@ def info() -> None:
             f"Profile File: [dim]{p_path}[/dim]\n\n"
             f"[bold white]Primed Active Constraints:[/bold white]\n"
             f"🚚 Logistical: [cyan]{active_log}[/cyan]\n"
-            f"🎨 Creative: [magenta]{active_cre}[/magenta]"
+            f"🎬 Directorial: [magenta]{active_dir}[/magenta]\n"
+            f"🧠 Thematic: [blue]{active_them}[/blue]\n"
+            f"💡 Idea Seed: [green]{active_idea}[/green]"
         )
     else:
         profile_info = (

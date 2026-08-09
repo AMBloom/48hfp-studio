@@ -21,7 +21,7 @@ def sample_profile():
         admin_username="alex_admin",
         location="San Francisco, CA",
         active_logistical_constraint="SF Locations",
-        active_creative_constraint="Sci-Fi Toolkit",
+        active_directorial_vision="Sci-Fi Toolkit",
     )
 
 

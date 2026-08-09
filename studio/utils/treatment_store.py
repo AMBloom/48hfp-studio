@@ -179,16 +179,31 @@ def save_treatment_output(
     # Resolve active constraints for naming
     profile = load_profile()
     log_name = "Unconstrained"
-    cre_name = "Unconstrained"
+    dir_name = "Unconstrained"
+    them_name = "Unconstrained"
+    idea_name = "Unconstrained"
 
     if profile:
         if profile.active_logistical_constraint:
             log_name = profile.active_logistical_constraint
-        if profile.active_creative_constraint:
-            cre_name = profile.active_creative_constraint
+        if profile.active_directorial_vision:
+            dir_name = profile.active_directorial_vision
+        if profile.active_thematic_framework:
+            them_name = profile.active_thematic_framework
+        if profile.active_idea_seed:
+            idea_name = profile.active_idea_seed
+
+    raw_title = (
+        treatment.title_and_logline.title
+        if (treatment and treatment.title_and_logline and treatment.title_and_logline.title)
+        else "Untitled"
+    )
+    title_clean = sanitize_filename_part(raw_title)
 
     log_clean = sanitize_filename_part(log_name)
-    cre_clean = sanitize_filename_part(cre_name)
+    dir_clean = sanitize_filename_part(dir_name)
+    them_clean = sanitize_filename_part(them_name)
+    idea_clean = sanitize_filename_part(idea_name)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Guardrail 3 & 2: Calculate version and format with zero-padding
@@ -198,7 +213,7 @@ def save_treatment_output(
     while True:
         # Guardrail 2: Zero-padded 2-digit integer e.g., v01, v02
         version_str = f"v{version:02d}"
-        filename = f"treatment_{version_str}_{log_clean}_{cre_clean}_{timestamp}.md"
+        filename = f"treatment_{version_str}_{title_clean}_{log_clean}_{dir_clean}_{them_clean}_{idea_clean}_{timestamp}.md"
         file_path = target_dir / filename
 
         if not file_path.exists():

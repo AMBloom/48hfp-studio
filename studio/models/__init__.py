@@ -3,8 +3,10 @@
 from studio.models.constraints import (
     CharacterDetail,
     ConstraintType,
-    CreativeConstraint,
+    DirectorialVision,
+    IdeaSeed,
     LogisticalConstraint,
+    ThematicFramework,
 )
 from studio.models.draw import (
     GENRES_GROUP_1,
@@ -28,7 +30,9 @@ __all__ = [
     "CharacterDetail",
     "ConstraintType",
     "LogisticalConstraint",
-    "CreativeConstraint",
+    "DirectorialVision",
+    "ThematicFramework",
+    "IdeaSeed",
     "FridayDraw",
     "GENRES_GROUP_1",
     "GENRES_GROUP_2",

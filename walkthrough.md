@@ -1,66 +1,56 @@
-# Walkthrough - Sprint 6.4: In-TUI Constraint Library Management (CRUD)
+# Sprint 7.2 Walkthrough - Data Model Refactor & Workspace Enhancements
 
-We have successfully created and integrated the interactive In-TUI Constraint Library Management (CRUD) system for Logistical and Creative Constraint Sets in 48HFP-Studio.
+## Overview
+Sprint 7.2 delivers UI rendering stabilization, Pydantic data model refactoring for production teams and logistical constraints, interactive modal enhancements, transient prompt directive injection, and comprehensive unit/integration test coverage.
 
-## Changes Completed
+## Key Changes Executed
 
-### 1. Constraint Form Screens (`studio/screens_constraints.py`)
-* Created **`LogisticalConstraintScreen(ModalScreen[Optional[LogisticalConstraint]])`**:
-  * Form inputs for constraint name (slug), description, locations, sub-locations, location details, main character traits (name, traits, wardrobe, notes), and props & dialogue lines.
-  * Form validation, YAML saving via `save_logistical_constraint()`, and dismissal with the saved model.
-* Created **`CreativeConstraintScreen(ModalScreen[Optional[CreativeConstraint]])`**:
-  * Form inputs for constraint name (slug), description, scenarios, core philosophy, scene economy, progression & climax, and visuals/audio/post directives.
-  * Form validation, YAML saving via `save_creative_constraint()`, and dismissal with the saved model.
+### 1. UI Stabilization (The "Ghosting" Fix)
+- **[workspace.py](file:///home/andrew/48HFP%20App/studio/workspace.py)**: Wrapped `#recipe-content` inside a dedicated `#recipe-scroll` `VerticalScroll` container with explicit width constraints (`width: 100% - 2;`). This enforces a strict rendering boundary that prevents recipe text from ghosting or bleeding past the right border.
 
-### 2. Constraint Library Screen (`studio/screens_library.py`)
-* Created **`ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]])`**:
-  * Split layout featuring two `DataTable` widgets displaying all saved Logistical Sets and Creative Sets fetched via `list_logistical_constraints()` and `list_creative_constraints()`.
-  * Visual status badges (`✅ ACTIVE`) indicating currently assigned active constraints.
-  * Toolbar actions:
-    * **New Logistical**: Launches `LogisticalConstraintScreen`.
-    * **New Creative**: Launches `CreativeConstraintScreen`.
-    * **Edit Selected**: Loads selected model and launches form screen pre-populated.
-    * **Delete Selected**: Deletes constraint YAML file via `delete_logistical_constraint()` or `delete_creative_constraint()`, clearing active profile references if applicable.
-    * **Set Active**: Updates active constraint fields on `app_profile`, saves profile to `.48hfp_profile.yaml`, refreshes active indicators, and sends user notification.
+### 2. Roster Segmentation & Gear Inventory (`TeamProfile` Refactor)
+- **[profile.py](file:///home/andrew/48HFP%20App/studio/models/profile.py)**:
+  - Renamed `roles` to `crew: Dict[str, List[str]]`.
+  - Added `@model_validator(mode="before")` to automatically migrate legacy `roles` fields in YAML profiles to `crew`.
+  - Added `.roles` backward-compatibility property.
+  - Added `cast: List[Dict[str, str]]` (storing `name`, `age_range`, `gender`, `physicality`).
+  - Added `available_gear: List[str]` catalog.
+- **[screens.py](file:///home/andrew/48HFP%20App/studio/screens.py)**: Refactored `ProfileSetupScreen`:
+  - Separate **Crew Roster Builder** section with role selection, member name input, and crew `DataTable`.
+  - Separate **Cast Roster Builder** section with 4 distinct data inputs (`Name`, `Age Range`, `Gender`, `Physicality`) and dedicated cast `DataTable`.
+  - Dedicated `TextArea` widget for cataloging **Available Gear & Equipment**.
+- **[ui.py](file:///home/andrew/48HFP%20App/studio/utils/ui.py)**: Updated `display_profile_table` to render Crew, Cast, and Gear tables/panels.
 
-### 3. TUI Integration (`studio/tui.py`)
-* Added keybinding `("l", "open_library", "Constraint Library")` to `StudioApp.BINDINGS`.
-* Added trigger button `Button("📚 Constraints [L]", id="btn_library_modal")` to `NavigationSidebar`.
-* Implemented `action_open_library()` pushing `ConstraintLibraryScreen` with `update_profile` callback to trigger reactive HUD & sidebar updates.
+### 3. Logistical Schema Cleanup
+- **[constraints.py](file:///home/andrew/48HFP%20App/studio/models/constraints.py)**:
+  - Removed obsolete `main_character_details` field.
+  - Renamed `props_and_dialogue` to `available_set_dressing: List[str]`.
+  - Added `@model_validator(mode="before")` for smooth deserialization of legacy constraint files.
+  - Added `.props_and_dialogue` backward-compatibility property.
+- **[screens_constraints.py](file:///home/andrew/48HFP%20App/studio/screens_constraints.py)**:
+  - Removed main character inputs from `LogisticalConstraintScreen`.
+  - Renamed props input to "Available Set Dressing & Wardrobe".
+  - **Bug Fix**: Extracted `location_details` from `TextArea("#location_details")` during `action_save()`.
+- **[ui.py](file:///home/andrew/48HFP%20App/studio/utils/ui.py)**: Updated `display_logistical_detail` to display set dressing and remove main character section.
 
-### 4. Unit Test Verification (`tests/test_phase6_4.py`)
-Created automated async tests covering:
-* `test_logistical_constraint_screen_submit()`
-* `test_logistical_constraint_screen_cancel()`
-* `test_creative_constraint_screen_submit()`
-* `test_creative_constraint_screen_cancel()`
-* `test_constraint_library_screen_rendering_and_set_active()`
-* `test_constraint_library_delete()`
-* `test_tui_integration_library_trigger()`
+### 4. Transient "Additional Instructions" & Prompt Compiler
+- **[workspace.py](file:///home/andrew/48HFP%20App/studio/workspace.py)**: Added `TextArea(id="additional_instructions")` widget with fixed height (`height: 5; max-height: 6;`) to prevent overflowing the "Generate Treatment" button.
+- **[tui.py](file:///home/andrew/48HFP%20App/studio/tui.py)**: Updated `action_generate_treatment()` to query the `#additional_instructions` text from `RecipePane` and pass it to the compiler.
+- **[prompt_builder.py](file:///home/andrew/48HFP%20App/studio/utils/prompt_builder.py)**:
+  - Updated `compile_system_prompt()` to accept `additional_instructions: Optional[str] = None`.
+  - If provided and non-empty, injects a new `ADDITIONAL FILMMAKER DIRECTIVES` section into the prompt hierarchy directly above Output Schema Directives.
+  - If `additional_instructions` is empty or only whitespace, the section is completely omitted from the prompt to conserve tokens.
+  - Updated global state and logistical sections to format Crew, Cast, Gear, and Set Dressing.
+
+### 5. Test Suite Updates
+- **[test_phase7_2.py](file:///home/andrew/48HFP%20App/tests/test_phase7_2.py)**: Added 7 unit and async pilot integration tests.
+  - Verification: All 41 unit and integration tests across the entire test suite passed cleanly (`41 passed in 4.70s`).
 
 ---
 
 ## Verification Results
 
-### Test Suite Execution
 ```bash
-python -m pytest
-```
-Output:
-```
-============================= test session starts ==============================
-platform linux -- Python 3.12.2, pytest-8.3.3, pluggy-1.5.0
-collected 33 items
-
-tests/test_phase3.py ...                                                [  9%]
-tests/test_phase4.py ......                                             [ 27%]
-tests/test_phase5_2.py .                                                [ 30%]
-tests/test_phase5_3.py ...                                              [ 39%]
-tests/test_phase5_4.py .                                                [ 42%]
-tests/test_phase6_1.py ...                                              [ 51%]
-tests/test_phase6_2.py ......                                           [ 69%]
-tests/test_phase6_3.py ...                                              [ 78%]
-tests/test_phase6_4.py .......                                          [100%]
-
-============================== 33 passed in 10.74s ==============================
+$ pytest tests/
+============================== 41 passed in 4.70s ==============================
 ```

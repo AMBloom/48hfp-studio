@@ -4,7 +4,7 @@ from typing import Optional
 from textual.app import ComposeResult
 from textual.containers import Horizontal, VerticalScroll
 from textual.reactive import reactive
-from textual.widgets import Button, LoadingIndicator, Markdown, Static
+from textual.widgets import Button, Label, LoadingIndicator, Markdown, Static, TextArea
 
 from studio.models.draw import FridayDraw
 from studio.models.profile import TeamProfile
@@ -38,11 +38,35 @@ class RecipePane(Static):
         color: $text;
         border-right: heavy $accent;
         padding: 1 2;
+        layout: vertical;
+    }
+
+    #recipe-scroll {
+        width: 100%;
+        height: 1fr;
+        overflow-x: hidden;
+        overflow-y: auto;
+        padding-right: 2;
     }
 
     #recipe-content {
-        height: 1fr;
-        overflow-y: auto;
+        width: 100%;
+        margin-bottom: 1;
+    }
+
+    .field-label {
+        color: $text;
+        text-style: bold;
+        margin-top: 1;
+        margin-bottom: 0;
+    }
+
+    #additional_instructions {
+        width: 100%;
+        height: 5;
+        max-height: 6;
+        margin-top: 1;
+        margin-bottom: 1;
     }
 
     #btn_generate_treatment {
@@ -73,12 +97,18 @@ class RecipePane(Static):
         self.update_content()
 
     def compose(self) -> ComposeResult:
+        with VerticalScroll(id="recipe-scroll"):
+            yield Static(id="recipe-content")
+            yield Label("📝 [bold yellow]ADDITIONAL FILMMAKER DIRECTIVES[/bold yellow]", classes="field-label")
+            yield TextArea(
+                placeholder="Optional custom instructions for this generation run...",
+                id="additional_instructions",
+            )
         yield Button(
             "⚡ Generate Treatment [G]",
             id="btn_generate_treatment",
             variant="success",
         )
-        yield Static(id="recipe-content")
 
     def update_content(self) -> None:
         try:
@@ -94,9 +124,13 @@ class RecipePane(Static):
             lines.append(f"• Team: [green]{self.profile.team_name}[/green]")
             lines.append(f"• Location: [yellow]{self.profile.location}[/yellow]")
             log_c = self.profile.active_logistical_constraint or "None"
-            cre_c = self.profile.active_creative_constraint or "None"
-            lines.append(f"• Logistics Set: [cyan]{log_c}[/cyan]")
-            lines.append(f"• Creative Set: [magenta]{cre_c}[/magenta]")
+            dir_v = self.profile.active_directorial_vision or "None"
+            them_f = self.profile.active_thematic_framework or "None"
+            idea_s = self.profile.active_idea_seed or "None"
+            lines.append(f"• Logistics: [cyan]{log_c}[/cyan]")
+            lines.append(f"• Directorial: [magenta]{dir_v}[/magenta]")
+            lines.append(f"• Thematic: [blue]{them_f}[/blue]")
+            lines.append(f"• Idea Seed: [yellow]{idea_s}[/yellow]")
         else:
             lines.append("• [dim]Team Profile: Unconfigured[/dim]")
 
@@ -118,6 +152,7 @@ class RecipePane(Static):
             lines.append("[dim]Run `48hfp draw` or click 'Open Draw Wizard' [D] to record draw data.[/dim]")
 
         content_widget.update("\n".join(lines))
+        content_widget.refresh()
 
 
 class OutputPane(Static):

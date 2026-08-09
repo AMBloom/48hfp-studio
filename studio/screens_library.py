@@ -1,30 +1,38 @@
-"""Modal screen for managing and selecting Logistical and Creative Constraint Sets."""
+"""Modal screen for managing and selecting tri-split constraint sets."""
 
 from typing import Optional, Tuple
 from textual.app import ComposeResult
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Button, DataTable, Label, Static
+from textual.widgets import Button, DataTable, Label, Static, TabbedContent, TabPane
 
 from studio.models.profile import TeamProfile
 from studio.screens_constraints import (
-    CreativeConstraintScreen,
+    DirectorialVisionScreen,
+    IdeaSeedScreen,
     LogisticalConstraintScreen,
+    ThematicFrameworkScreen,
 )
 from studio.utils.constraint_store import (
-    delete_creative_constraint,
+    delete_directorial_vision,
+    delete_idea_seed,
     delete_logistical_constraint,
-    list_creative_constraints,
+    delete_thematic_framework,
+    list_directorial_visions,
+    list_idea_seeds,
     list_logistical_constraints,
-    load_creative_constraint,
+    list_thematic_frameworks,
+    load_directorial_vision,
+    load_idea_seed,
     load_logistical_constraint,
+    load_thematic_framework,
     seed_default_constraints,
 )
 from studio.utils.profile_store import save_profile
 
 
 class ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]]):
-    """Interactive Modal Screen for managing constraint sets and assigning active profile sets."""
+    """Interactive Modal Screen for managing constraint sets across tabbed categories."""
 
     DEFAULT_CSS = """
     ConstraintLibraryScreen {
@@ -34,35 +42,22 @@ class ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]]):
 
     #library-dialog {
         padding: 1 2;
-        width: 100;
-        height: 85%;
+        width: 95vw;
+        max-width: 140;
+        height: 90vh;
+        layout: vertical;
         background: $surface;
         border: thick $accent;
     }
 
-    #tables-container {
+    TabbedContent {
         height: 1fr;
-        layout: horizontal;
         margin-top: 1;
-        margin-bottom: 1;
+        margin-bottom: 3;
     }
 
-    .table-box {
-        width: 1fr;
-        height: 100%;
-        margin-right: 1;
-    }
-
-    .table-box-right {
-        width: 1fr;
-        height: 100%;
-        margin-left: 1;
-    }
-
-    .section-title {
-        text-style: bold;
-        color: $accent;
-        margin-bottom: 1;
+    TabPane {
+        padding: 1;
     }
 
     DataTable {
@@ -72,6 +67,8 @@ class ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]]):
 
     #library-action-bar {
         height: 3;
+        dock: bottom;
+        margin-bottom: 1;
         align: right middle;
     }
 
@@ -87,7 +84,6 @@ class ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]]):
     def __init__(self, current_profile: Optional[TeamProfile] = None) -> None:
         super().__init__()
         self.current_profile = current_profile
-        self.last_focused_section: str = "logistical"
 
     def compose(self) -> ComposeResult:
         with Container(id="library-dialog"):
@@ -95,21 +91,21 @@ class ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]]):
                 "📚 [bold cyan]CONSTRAINT SETS LIBRARY[/bold cyan]", classes="title"
             )
             yield Static(
-                "[dim]Manage logistical shoot setups and creative directorial guidelines. Select a set and click 'Set Active'.[/dim]"
+                "[dim]Manage logistical, directorial, thematic, and idea constraints. Select a set and click 'Set Active'.[/dim]"
             )
 
-            with Horizontal(id="tables-container"):
-                with Vertical(classes="table-box"):
-                    yield Label("📋 Logistical Constraint Sets", classes="section-title")
+            with TabbedContent(id="library_tabs"):
+                with TabPane("📋 Logistical", id="tab_logistical"):
                     yield DataTable(id="logistical_table", cursor_type="row")
-
-                with Vertical(classes="table-box-right"):
-                    yield Label("🎨 Creative Constraint Sets", classes="section-title")
-                    yield DataTable(id="creative_table", cursor_type="row")
+                with TabPane("🎬 Directorial Vision", id="tab_directorial"):
+                    yield DataTable(id="directorial_table", cursor_type="row")
+                with TabPane("🧠 Thematic Framework", id="tab_thematic"):
+                    yield DataTable(id="thematic_table", cursor_type="row")
+                with TabPane("💡 Idea Seeds", id="tab_ideas"):
+                    yield DataTable(id="ideas_table", cursor_type="row")
 
             with Horizontal(id="library-action-bar"):
-                yield Button("New Logistical", variant="default", id="btn_new_logistical")
-                yield Button("New Creative", variant="default", id="btn_new_creative")
+                yield Button("New", variant="default", id="btn_new")
                 yield Button("Edit Selected", variant="default", id="btn_edit_selected")
                 yield Button("Delete Selected", variant="error", id="btn_delete_selected")
                 yield Button("Set Active", variant="primary", id="btn_set_active")
@@ -122,88 +118,100 @@ class ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]]):
         log_table = self.query_one("#logistical_table", DataTable)
         log_table.add_columns("Name", "Locations", "Status")
 
-        cre_table = self.query_one("#creative_table", DataTable)
-        cre_table.add_columns("Name", "Core Philosophy", "Status")
+        dir_table = self.query_one("#directorial_table", DataTable)
+        dir_table.add_columns("Name", "Visual Economy", "Status")
+
+        them_table = self.query_one("#thematic_table", DataTable)
+        them_table.add_columns("Name", "Core Philosophy", "Status")
+
+        idea_table = self.query_one("#ideas_table", DataTable)
+        idea_table.add_columns("Name", "Inciting Incident", "Status")
 
         self.refresh_tables()
 
     def refresh_tables(self) -> None:
-        """Fetch constraint sets from store and refresh DataTable rows."""
+        """Fetch constraint sets from store and refresh DataTable rows across all tabs."""
         log_table = self.query_one("#logistical_table", DataTable)
-        cre_table = self.query_one("#creative_table", DataTable)
+        dir_table = self.query_one("#directorial_table", DataTable)
+        them_table = self.query_one("#thematic_table", DataTable)
+        idea_table = self.query_one("#ideas_table", DataTable)
 
         log_table.clear()
-        cre_table.clear()
+        dir_table.clear()
+        them_table.clear()
+        idea_table.clear()
 
-        active_log = (
-            self.current_profile.active_logistical_constraint
-            if self.current_profile
-            else None
-        )
-        active_cre = (
-            self.current_profile.active_creative_constraint
-            if self.current_profile
-            else None
-        )
+        prof = self.current_profile
+        active_log = prof.active_logistical_constraint if prof else None
+        active_dir = prof.active_directorial_vision if prof else None
+        active_them = prof.active_thematic_framework if prof else None
+        active_idea = prof.active_idea_seed if prof else None
 
         for c in list_logistical_constraints():
-            is_active = active_log and c.name == active_log
-            status = "✅ ACTIVE" if is_active else ""
+            status = "✅ ACTIVE" if active_log and c.name == active_log else ""
             locs = ", ".join(c.locations[:2]) if c.locations else "N/A"
             log_table.add_row(c.name, locs, status, key=c.name)
 
-        for c in list_creative_constraints():
-            is_active = active_cre and c.name == active_cre
-            status = "✅ ACTIVE" if is_active else ""
-            phil = (
-                c.core_philosophy[:25] + "..."
-                if len(c.core_philosophy) > 25
-                else c.core_philosophy or "N/A"
-            )
-            cre_table.add_row(c.name, phil, status, key=c.name)
+        for c in list_directorial_visions():
+            status = "✅ ACTIVE" if active_dir and c.name == active_dir else ""
+            vis = c.visual_economy[:30] + "..." if len(c.visual_economy) > 30 else c.visual_economy or "N/A"
+            dir_table.add_row(c.name, vis, status, key=c.name)
 
-    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
-        """Track which table was last focused/highlighted by user."""
-        if event.data_table.has_focus:
-            if event.data_table.id == "logistical_table":
-                self.last_focused_section = "logistical"
-            elif event.data_table.id == "creative_table":
-                self.last_focused_section = "creative"
+        for c in list_thematic_frameworks():
+            status = "✅ ACTIVE" if active_them and c.name == active_them else ""
+            phil = c.core_philosophy[:30] + "..." if len(c.core_philosophy) > 30 else c.core_philosophy or "N/A"
+            them_table.add_row(c.name, phil, status, key=c.name)
 
-    def on_focus(self, event) -> None:
-        """Track when a table or section receives focus."""
-        widget_id = getattr(event.widget, "id", None)
-        if widget_id == "logistical_table":
-            self.last_focused_section = "logistical"
-        elif widget_id == "creative_table":
-            self.last_focused_section = "creative"
+        for c in list_idea_seeds():
+            status = "✅ ACTIVE" if active_idea and c.name == active_idea else ""
+            inc = c.inciting_incident[:30] + "..." if len(c.inciting_incident) > 30 else c.inciting_incident or "N/A"
+            idea_table.add_row(c.name, inc, status, key=c.name)
+
+    def _get_active_category(self) -> str:
+        """Return the category string corresponding to the currently active TabPane."""
+        try:
+            tabbed = self.query_one("#library_tabs", TabbedContent)
+            active_id = tabbed.active
+            if active_id == "tab_directorial":
+                return "directorial"
+            elif active_id == "tab_thematic":
+                return "thematic"
+            elif active_id == "tab_ideas":
+                return "ideas"
+        except Exception:
+            pass
+        return "logistical"
+
+    def _get_table_for_category(self, category: str) -> DataTable:
+        """Return the DataTable corresponding to a given category."""
+        if category == "directorial":
+            return self.query_one("#directorial_table", DataTable)
+        elif category == "thematic":
+            return self.query_one("#thematic_table", DataTable)
+        elif category == "ideas":
+            return self.query_one("#ideas_table", DataTable)
+        return self.query_one("#logistical_table", DataTable)
 
     def _get_selected_constraint(self) -> Tuple[str, Optional[str]]:
-        """Return (category, name) of currently selected item in active table."""
-        log_table = self.query_one("#logistical_table", DataTable)
-        cre_table = self.query_one("#creative_table", DataTable)
+        """Return (category, name) of currently selected item in the active tab table."""
+        category = self._get_active_category()
+        table = self._get_table_for_category(category)
 
-        # Check explicit focus first
-        if log_table.has_focus:
-            section = "logistical"
-            table = log_table
-        elif cre_table.has_focus:
-            section = "creative"
-            table = cre_table
-        else:
-            section = self.last_focused_section
-            table = log_table if section == "logistical" else cre_table
+        if table.row_count > 0 and table.cursor_row is not None:
+            try:
+                cell_val = str(table.get_cell_at((table.cursor_row, 0)))
+                if cell_val:
+                    return category, cell_val
+            except Exception:
+                pass
 
-        if table.row_count == 0:
-            return section, None
+        if table.row_count > 0:
+            try:
+                return category, str(table.get_cell_at((0, 0)))
+            except Exception:
+                pass
 
-        cursor_row = table.cursor_row if table.cursor_row is not None else 0
-
-        try:
-            cell_val = str(table.get_cell_at((cursor_row, 0)))
-            return section, cell_val
-        except Exception:
-            return section, None
+        return category, None
 
     def action_cancel(self) -> None:
         self.dismiss(self.current_profile)
@@ -212,10 +220,8 @@ class ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]]):
         btn_id = event.button.id
         if btn_id == "btn_close_library":
             self.action_cancel()
-        elif btn_id == "btn_new_logistical":
-            self.action_new_logistical()
-        elif btn_id == "btn_new_creative":
-            self.action_new_creative()
+        elif btn_id in ["btn_new", "btn_new_logistical"]:
+            self.action_new()
         elif btn_id == "btn_edit_selected":
             self.action_edit_selected()
         elif btn_id == "btn_delete_selected":
@@ -223,17 +229,20 @@ class ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]]):
         elif btn_id == "btn_set_active":
             self.action_set_active()
 
-    def action_new_logistical(self) -> None:
+    def action_new(self) -> None:
+        category = self._get_active_category()
+
         def on_saved(result):
             self.refresh_tables()
 
-        self.app.push_screen(LogisticalConstraintScreen(), callback=on_saved)
-
-    def action_new_creative(self) -> None:
-        def on_saved(result):
-            self.refresh_tables()
-
-        self.app.push_screen(CreativeConstraintScreen(), callback=on_saved)
+        if category == "logistical":
+            self.app.push_screen(LogisticalConstraintScreen(), callback=on_saved)
+        elif category == "directorial":
+            self.app.push_screen(DirectorialVisionScreen(), callback=on_saved)
+        elif category == "thematic":
+            self.app.push_screen(ThematicFrameworkScreen(), callback=on_saved)
+        elif category == "ideas":
+            self.app.push_screen(IdeaSeedScreen(), callback=on_saved)
 
     def action_edit_selected(self) -> None:
         category, name = self._get_selected_constraint()
@@ -247,15 +256,19 @@ class ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]]):
         if category == "logistical":
             c_log = load_logistical_constraint(name)
             if c_log:
-                self.app.push_screen(
-                    LogisticalConstraintScreen(c_log), callback=on_saved
-                )
-        else:
-            c_cre = load_creative_constraint(name)
-            if c_cre:
-                self.app.push_screen(
-                    CreativeConstraintScreen(c_cre), callback=on_saved
-                )
+                self.app.push_screen(LogisticalConstraintScreen(c_log), callback=on_saved)
+        elif category == "directorial":
+            c_dir = load_directorial_vision(name)
+            if c_dir:
+                self.app.push_screen(DirectorialVisionScreen(c_dir), callback=on_saved)
+        elif category == "thematic":
+            c_them = load_thematic_framework(name)
+            if c_them:
+                self.app.push_screen(ThematicFrameworkScreen(c_them), callback=on_saved)
+        elif category == "ideas":
+            c_idea = load_idea_seed(name)
+            if c_idea:
+                self.app.push_screen(IdeaSeedScreen(c_idea), callback=on_saved)
 
     def action_delete_selected(self) -> None:
         category, name = self._get_selected_constraint()
@@ -263,16 +276,29 @@ class ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]]):
             self.notify("No constraint set selected for deletion.", severity="warning")
             return
 
+        deleted = False
+        prof = self.current_profile
+
         if category == "logistical":
             deleted = delete_logistical_constraint(name)
-            if deleted and self.current_profile and self.current_profile.active_logistical_constraint == name:
-                self.current_profile.active_logistical_constraint = None
-                save_profile(self.current_profile)
-        else:
-            deleted = delete_creative_constraint(name)
-            if deleted and self.current_profile and self.current_profile.active_creative_constraint == name:
-                self.current_profile.active_creative_constraint = None
-                save_profile(self.current_profile)
+            if deleted and prof and prof.active_logistical_constraint == name:
+                prof.active_logistical_constraint = None
+                save_profile(prof)
+        elif category == "directorial":
+            deleted = delete_directorial_vision(name)
+            if deleted and prof and prof.active_directorial_vision == name:
+                prof.active_directorial_vision = None
+                save_profile(prof)
+        elif category == "thematic":
+            deleted = delete_thematic_framework(name)
+            if deleted and prof and prof.active_thematic_framework == name:
+                prof.active_thematic_framework = None
+                save_profile(prof)
+        elif category == "ideas":
+            deleted = delete_idea_seed(name)
+            if deleted and prof and prof.active_idea_seed == name:
+                prof.active_idea_seed = None
+                save_profile(prof)
 
         if deleted:
             self.notify(f"Deleted '{name}' constraint set.", severity="information")
@@ -292,8 +318,12 @@ class ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]]):
 
         if category == "logistical":
             self.current_profile.active_logistical_constraint = name
-        else:
-            self.current_profile.active_creative_constraint = name
+        elif category == "directorial":
+            self.current_profile.active_directorial_vision = name
+        elif category == "thematic":
+            self.current_profile.active_thematic_framework = name
+        elif category == "ideas":
+            self.current_profile.active_idea_seed = name
 
         save_profile(self.current_profile)
         self.refresh_tables()
@@ -302,3 +332,4 @@ class ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]]):
             title="Constraint Activated",
             severity="information",
         )
+

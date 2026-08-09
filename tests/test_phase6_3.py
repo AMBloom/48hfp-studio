@@ -33,7 +33,7 @@ def sample_profile():
         admin_username="alex_admin",
         location="San Francisco, CA",
         active_logistical_constraint="Indie Micro-Budget",
-        active_creative_constraint="Film Noir Directorial",
+        active_directorial_vision="Film Noir Directorial",
     )
 
 

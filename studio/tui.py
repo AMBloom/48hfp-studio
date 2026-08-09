@@ -10,7 +10,7 @@ from textual.widgets import Button, Footer, Header, Label, Static
 from studio.inference import InferenceEngine, InferenceError
 from studio.models.draw import FridayDraw
 from studio.models.profile import TeamProfile
-from studio.screens import DrawWizardScreen, ProfileSetupScreen
+from studio.screens import ApiSettingsScreen, DrawWizardScreen, ProfileSetupScreen
 from studio.screens_library import ConstraintLibraryScreen
 from studio.utils.draw_store import load_draw
 from studio.utils.profile_store import load_profile
@@ -89,16 +89,21 @@ class NavigationSidebar(Static):
         yield Button("👤 Profile Setup [P]", id="btn_profile_modal", variant="default")
         yield Button("🎲 Friday Draw [D]", id="btn_draw_modal", variant="primary")
         yield Button("📚 Constraints [L]", id="btn_library_modal", variant="default")
+        yield Button("⚙️ Settings [S]", id="btn_settings_modal", variant="default")
 
     def update_content(self) -> None:
         if self.profile:
             team_info = f"[bold green]{self.profile.team_name}[/bold green]"
             admin_info = f"Admin: [cyan]{self.profile.admin_username}[/cyan]"
             log_c = self.profile.active_logistical_constraint or "None"
-            cre_c = self.profile.active_creative_constraint or "None"
+            dir_v = self.profile.active_directorial_vision or "None"
+            them_f = self.profile.active_thematic_framework or "None"
+            idea_s = self.profile.active_idea_seed or "None"
             constraint_info = (
                 f"Logistics: [yellow]{log_c}[/yellow]\n"
-                f"Creative: [magenta]{cre_c}[/magenta]"
+                f"Directorial: [magenta]{dir_v}[/magenta]\n"
+                f"Thematic: [blue]{them_f}[/blue]\n"
+                f"Idea Seed: [green]{idea_s}[/green]"
             )
         else:
             team_info = "[dim]Team: Unconfigured[/dim]"
@@ -107,16 +112,10 @@ class NavigationSidebar(Static):
 
         content = (
             "🧭 [bold cyan]NAVIGATION[/bold cyan]\n\n"
-            "👤 [bold white]TEAM PROFILE[/bold white]\n"
+            "👤 [bold white]TEAM STATUS[/bold white]\n"
             f"• {team_info}\n"
             f"• {admin_info}\n"
-            f"• {constraint_info}\n\n"
-            "📌 [bold white]MENU[/bold white]\n"
-            "• [bold white]Dashboard[/bold white]\n"
-            "• [dim]Team Profile[/dim]\n"
-            "• [dim]Friday Draw[/dim]\n"
-            "• [dim]Constraints[/dim]\n"
-            "• [dim]Treatment Generator[/dim]\n"
+            f"• {constraint_info}\n"
         )
         self.update(content)
 
@@ -148,6 +147,7 @@ class StudioApp(App):
         ("d", "open_draw_wizard", "Friday Draw"),
         ("p", "open_profile_setup", "Profile Setup"),
         ("l", "open_library", "Constraint Library"),
+        ("s", "open_api_settings", "API Settings"),
         ("g", "generate_treatment", "Generate Treatment"),
         ("q", "quit", "Quit"),
         ("ctrl+c", "quit", "Quit"),
@@ -209,14 +209,29 @@ class StudioApp(App):
         """Push the ConstraintLibraryScreen modal."""
         self.push_screen(ConstraintLibraryScreen(self.app_profile), callback=self.update_profile)
 
+    def action_open_api_settings(self) -> None:
+        """Push the ApiSettingsScreen modal."""
+        self.push_screen(ApiSettingsScreen())
+
     @work(thread=True)
     def action_generate_treatment(self) -> None:
         """Compile system prompt and generate film treatment in background worker thread."""
         self.call_from_thread(self._set_generating_state, True)
+        extra_directives = None
+        try:
+            from textual.widgets import TextArea
+            from studio.workspace import RecipePane
+            recipe_pane = self.query_one(RecipePane)
+            ta = recipe_pane.query_one("#additional_instructions", TextArea)
+            extra_directives = ta.text
+        except Exception:
+            pass
+
         try:
             prompt = PromptBuilder.compile_system_prompt(
                 draw=self.app_draw,
                 profile=self.app_profile,
+                additional_instructions=extra_directives,
             )
             treatment = InferenceEngine.generate_treatment(prompt=prompt)
             saved_path = save_treatment_output(treatment, prompt_text=prompt)
@@ -264,12 +279,12 @@ class StudioApp(App):
     def update_draw(self, new_draw: Optional[FridayDraw]) -> None:
         """Callback invoked when DrawWizardScreen is dismissed."""
         if new_draw is not None:
-            self.app_draw = new_draw
+            self.app_draw = load_draw() or new_draw
 
     def update_profile(self, new_profile: Optional[TeamProfile]) -> None:
-        """Callback invoked when ProfileSetupScreen is dismissed."""
+        """Callback invoked when ProfileSetupScreen or ConstraintLibraryScreen is dismissed."""
         if new_profile is not None:
-            self.app_profile = new_profile
+            self.app_profile = load_profile() or new_profile
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button presses from sidebar or workspace."""
@@ -279,6 +294,8 @@ class StudioApp(App):
             self.action_open_profile_setup()
         elif event.button.id == "btn_library_modal":
             self.action_open_library()
+        elif event.button.id == "btn_settings_modal":
+            self.action_open_api_settings()
         elif event.button.id == "btn_generate_treatment":
             self.action_generate_treatment()
 

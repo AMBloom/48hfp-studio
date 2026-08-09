@@ -2,16 +2,16 @@
 
 from unittest.mock import patch
 import pytest
-from studio.models.constraints import CreativeConstraint, LogisticalConstraint
+from studio.models.constraints import DirectorialVision, LogisticalConstraint
 from studio.models.profile import TeamProfile
 from studio.screens_constraints import (
-    CreativeConstraintScreen,
+    DirectorialVisionScreen,
     LogisticalConstraintScreen,
 )
 from studio.screens_library import ConstraintLibraryScreen
 from studio.tui import NavigationSidebar, StudioApp
 from studio.utils.constraint_store import (
-    save_creative_constraint,
+    save_directorial_vision,
     save_logistical_constraint,
 )
 from textual.widgets import Button, Input, TextArea
@@ -29,7 +29,7 @@ def sample_profile():
         admin_username="alex_admin",
         location="San Francisco, CA",
         active_logistical_constraint=None,
-        active_creative_constraint=None,
+        active_directorial_vision=None,
     )
 
 
@@ -94,14 +94,14 @@ async def test_logistical_constraint_screen_cancel():
 
 
 @pytest.mark.anyio
-async def test_creative_constraint_screen_submit(tmp_path):
-    """Verify CreativeConstraintScreen form submission, persistence, and result dismissal."""
+async def test_directorial_vision_screen_submit(tmp_path):
+    """Verify DirectorialVisionScreen form submission, persistence, and result dismissal."""
     constraints_dir = tmp_path / "constraints"
 
     with patch("studio.utils.constraint_store.get_constraints_base_dir", return_value=constraints_dir):
         app = StudioApp()
         async with app.run_test() as pilot:
-            screen = CreativeConstraintScreen()
+            screen = DirectorialVisionScreen()
             result_container = []
 
             app.push_screen(screen, callback=lambda res: result_container.append(res))
@@ -109,38 +109,35 @@ async def test_creative_constraint_screen_submit(tmp_path):
 
             screen.query_one("#name", Input).value = "neo_noir_noir"
             screen.query_one("#description", Input).value = "Gritty urban thriller"
-            screen.query_one("#scenarios", TextArea).text = "A detective uncovers a conspiracy in rain-slicked streets."
-            screen.query_one("#core_philosophy", TextArea).text = "Moral ambiguity and high contrast shadows"
-            screen.query_one("#scene_economy", TextArea).text = "Sharp, rhythmic cuts with voiceover monologues"
-            screen.query_one("#progression_and_climax", TextArea).text = "Rising tension leading to a confrontation at dusk"
-            screen.query_one("#visuals_and_post", TextArea).text = "Monochrome contrast with deep blues and ambient saxophone"
+            screen.query_one("#visual_economy", TextArea).text = "Sharp, rhythmic cuts with voiceover monologues"
+            screen.query_one("#lighting_color", TextArea).text = "High contrast shadows with neon reflections"
+            screen.query_one("#audio_landscape", TextArea).text = "Ambient acoustic score"
 
-            await pilot.click("#save_creative_btn")
+            await pilot.click("#save_directorial_btn")
             await pilot.pause()
 
             assert len(result_container) == 1
             saved = result_container[0]
-            assert isinstance(saved, CreativeConstraint)
+            assert isinstance(saved, DirectorialVision)
             assert saved.name == "neo_noir_noir"
-            assert "Moral ambiguity" in saved.core_philosophy
-            assert len(saved.scenarios) == 1
+            assert "High contrast" in saved.lighting_color
 
-            saved_file = constraints_dir / "creative" / "neo_noir_noir.yaml"
+            saved_file = constraints_dir / "directorial" / "neo_noir_noir.yaml"
             assert saved_file.exists()
 
 
 @pytest.mark.anyio
-async def test_creative_constraint_screen_cancel():
-    """Verify CreativeConstraintScreen dismisses returning None when canceled."""
+async def test_directorial_vision_screen_cancel():
+    """Verify DirectorialVisionScreen dismisses returning None when canceled."""
     app = StudioApp()
     async with app.run_test() as pilot:
-        screen = CreativeConstraintScreen()
+        screen = DirectorialVisionScreen()
         result_container = []
 
         app.push_screen(screen, callback=lambda res: result_container.append(res))
         await pilot.pause()
 
-        await pilot.click("#cancel_creative_btn")
+        await pilot.click("#cancel_directorial_btn")
         await pilot.pause()
 
         assert len(result_container) == 1
@@ -156,11 +153,11 @@ async def test_constraint_library_screen_rendering_and_set_active(tmp_path, samp
     with patch("studio.utils.constraint_store.get_constraints_base_dir", return_value=constraints_dir), patch(
         "studio.utils.profile_store.get_profile_path", return_value=profile_file
     ):
-        # Pre-seed one logistical and creative set
+        # Pre-seed one logistical and directorial set
         log_c = LogisticalConstraint(name="studio_soundstage", description="Controlled soundstage environment")
-        cre_c = CreativeConstraint(name="cyberpunk_fever", description="Futuristic dystopian energy")
+        dir_c = DirectorialVision(name="cyberpunk_fever", description="Futuristic dystopian energy")
         save_logistical_constraint(log_c)
-        save_creative_constraint(cre_c)
+        save_directorial_vision(dir_c)
 
         app = StudioApp()
         async with app.run_test() as pilot:
@@ -172,10 +169,10 @@ async def test_constraint_library_screen_rendering_and_set_active(tmp_path, samp
 
             # Verify tables rendered seeded constraints
             log_table = screen.query_one("#logistical_table")
-            cre_table = screen.query_one("#creative_table")
+            dir_table = screen.query_one("#directorial_table")
 
             assert log_table.row_count >= 1
-            assert cre_table.row_count >= 1
+            assert dir_table.row_count >= 1
 
             # Click Set Active on logistical table
             log_table.focus()
@@ -250,3 +247,4 @@ async def test_tui_integration_library_trigger():
         await pilot.pause()
 
         assert len(app.screen_stack) == 1
+

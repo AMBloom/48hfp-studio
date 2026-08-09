@@ -1,0 +1,17 @@
+name: interior_dive_bar
+description: Indoor bar/restaurant setup with medium sized crew.
+locations:
+- Interior (dive bar)
+sub_locations:
+- Bar
+- dining area
+- kitchen
+- bathrooms
+- parking lot
+location_details: A seedy dive bar with smoky atmosphere and rustic lighting.
+other_characters: []
+available_set_dressing:
+- Bar taps
+- Neon lights
+created_at: '2026-08-08T17:18:20.708004'
+updated_at: '2026-08-08T17:18:20.708448'

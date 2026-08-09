@@ -5,11 +5,15 @@ and provides error handling for API timeouts and missing credentials.
 """
 
 import os
+import time
 from typing import Optional
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
 from studio.models.treatment import TreatmentOutput
+
+load_dotenv()
 
 
 class InferenceError(Exception):
@@ -22,6 +26,7 @@ class InferenceEngine:
     """Interface for invoking Gemini models with structured outputs."""
 
     DEFAULT_MODEL = "gemini-3.6-flash"
+    MAX_RETRIES = 3
 
     @classmethod
     def generate_treatment(
@@ -54,28 +59,55 @@ class InferenceEngine:
             model_name or os.environ.get("GEMINI_MODEL") or cls.DEFAULT_MODEL
         )
 
-        try:
-            client = genai.Client(api_key=resolved_api_key)
-            response = client.models.generate_content(
-                model=resolved_model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=TreatmentOutput,
-                ),
-            )
+        last_exception = None
+        for attempt in range(1, cls.MAX_RETRIES + 1):
+            try:
+                client = genai.Client(api_key=resolved_api_key)
+                response = client.models.generate_content(
+                    model=resolved_model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=TreatmentOutput,
+                    ),
+                )
 
-            # Check if google-genai parsed the response automatically
-            if hasattr(response, "parsed") and isinstance(response.parsed, TreatmentOutput):
-                return response.parsed
+                # Check if google-genai parsed the response automatically
+                if hasattr(response, "parsed") and isinstance(response.parsed, TreatmentOutput):
+                    return response.parsed
 
-            # Fallback to manual JSON validation if parsed is not populated
-            if hasattr(response, "text") and response.text:
-                return TreatmentOutput.model_validate_json(response.text)
+                # Fallback to manual JSON validation if parsed is not populated
+                if hasattr(response, "text") and response.text:
+                    return TreatmentOutput.model_validate_json(response.text)
 
-            raise InferenceError("API returned an empty or invalid response payload.")
+                raise InferenceError("API returned an empty or invalid response payload.")
 
-        except InferenceError:
-            raise
-        except Exception as err:
-            raise InferenceError(f"Gemini API inference failed: {err}") from err
+            except InferenceError:
+                raise
+            except Exception as err:
+                last_exception = err
+                err_str = str(err).lower()
+                is_transient = any(
+                    code in err_str
+                    for code in [
+                        "500",
+                        "502",
+                        "503",
+                        "504",
+                        "overloaded",
+                        "unavailable",
+                        "resourceexhausted",
+                        "internal server error",
+                        "transient",
+                        "rate limit",
+                    ]
+                )
+                if is_transient and attempt < cls.MAX_RETRIES:
+                    backoff = 2 ** (attempt - 1)
+                    time.sleep(backoff)
+                    continue
+                else:
+                    raise InferenceError(f"Gemini API inference failed: {err}") from err
+
+        raise InferenceError(f"Gemini API inference failed after {cls.MAX_RETRIES} attempts: {last_exception}")
+
