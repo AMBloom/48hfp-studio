@@ -105,3 +105,49 @@ def test_tui_quiz_modal_instantiation() -> None:
 
     res = QuizEngine.calculate_result(modal.answers)
     assert res.winner_slug in ARCHETYPE_LIBRARY
+
+
+import pytest
+from studio.tui import StudioApp
+
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
+@pytest.mark.anyio
+async def test_tui_quiz_modal_async_rendering(tmp_path: Path) -> None:
+    """Test OnboardingQuizScreen mounting, question rendering, option selection, and result rendering in Textual."""
+    set_active_workspace(tmp_path)
+    seed_default_constraints()
+
+    app = StudioApp()
+    async with app.run_test() as pilot:
+        quiz_screen = OnboardingQuizScreen()
+        app.push_screen(quiz_screen)
+        await pilot.pause()
+
+        # Verify initial question view rendered
+        assert quiz_screen.current_q_idx == 0
+        assert not quiz_screen.is_completed
+
+        # Click through options for all 10 questions
+        for q_num in range(10):
+            await pilot.click("#opt_btn_0")
+            await pilot.pause()
+
+        # Verify quiz completed and result view rendered without compose stack errors
+        assert quiz_screen.is_completed
+        assert quiz_screen.quiz_result is not None
+        assert quiz_screen.query_one("#activate_quiz_btn") is not None
+
+        # Click activate
+        await pilot.click("#activate_quiz_btn")
+        await pilot.pause()
+
+        # Verify profile updated
+        profile = load_profile()
+        assert profile is not None
+        assert profile.active_directorial_vision == quiz_screen.quiz_result.winner_slug
+

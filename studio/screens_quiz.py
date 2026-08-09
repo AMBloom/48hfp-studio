@@ -55,13 +55,13 @@ class OnboardingQuizScreen(ModalScreen[Optional[str]]):
         text-align: left;
     }
 
-    #nav-bar {
+    .quiz-nav-bar {
         margin-top: 1;
         height: 3;
         align: right middle;
     }
 
-    #nav-bar Button {
+    .quiz-nav-bar Button {
         margin-left: 1;
     }
 
@@ -124,25 +124,29 @@ class OnboardingQuizScreen(ModalScreen[Optional[str]]):
         q = QUIZ_QUESTIONS[self.current_q_idx]
         total_q = len(QUIZ_QUESTIONS)
 
-        body.mount(Label(f"Question {self.current_q_idx + 1} of {total_q} [{q.category.upper()}]", classes="quiz-progress"))
-        body.mount(Label(q.prompt, classes="quiz-prompt"))
+        progress_label = Label(f"Question {self.current_q_idx + 1} of {total_q} [{q.category.upper()}]", classes="quiz-progress")
+        prompt_label = Label(q.prompt, classes="quiz-prompt")
 
-        with VerticalScroll():
-            for idx, opt in enumerate(q.options):
-                btn_variant = "primary" if self.answers.get(q.id) == idx else "default"
-                body.mount(
-                    Button(
-                        f"[{chr(65 + idx)}] {opt.text}",
-                        variant=btn_variant,
-                        id=f"opt_btn_{idx}",
-                        classes="option-btn",
-                    )
+        option_buttons = []
+        for idx, opt in enumerate(q.options):
+            btn_variant = "primary" if self.answers.get(q.id) == idx else "default"
+            option_buttons.append(
+                Button(
+                    f"[{chr(65 + idx)}] {opt.text}",
+                    variant=btn_variant,
+                    id=f"opt_btn_{idx}",
+                    classes="option-btn",
                 )
+            )
+        scroll = VerticalScroll(*option_buttons)
 
-        with Horizontal(id="nav-bar"):
-            if self.current_q_idx > 0:
-                body.mount(Button("← Previous", id="prev_q_btn", variant="default"))
-            body.mount(Button("Cancel", id="cancel_quiz_btn", variant="error"))
+        nav_buttons = []
+        if self.current_q_idx > 0:
+            nav_buttons.append(Button("← Previous", id="prev_q_btn", variant="default"))
+        nav_buttons.append(Button("Cancel", id="cancel_quiz_btn", variant="error"))
+        nav = Horizontal(*nav_buttons, classes="quiz-nav-bar")
+
+        body.mount(progress_label, prompt_label, scroll, nav)
 
     def render_result_view(self) -> None:
         """Render the quiz completion result and activation button."""
@@ -154,29 +158,29 @@ class OnboardingQuizScreen(ModalScreen[Optional[str]]):
 
         info = self.quiz_result.winner_info
 
-        body.mount(Label("🎬 [bold yellow]YOUR WINNING DIRECTOR ARCHETYPE[/bold yellow]", classes="result-header"))
-        body.mount(Label(f"🏆 [bold green]{info.director_name}[/bold green]", classes="result-director"))
-        body.mount(Label(f"\"{info.title}\"", classes="result-tagline"))
+        header_label = Label("🎬 [bold yellow]YOUR WINNING DIRECTOR ARCHETYPE[/bold yellow]", classes="result-header")
+        director_label = Label(f"🏆 [bold green]{info.director_name}[/bold green]", classes="result-director")
+        tagline_label = Label(f"\"{info.title}\"", classes="result-tagline")
 
-        with VerticalScroll():
-            with Container(classes="result-box"):
-                body.mount(
-                    Static(
-                        f"💬 [bold white]Quote:[/bold white]\n[italic]\"{info.quote}\"[/italic]\n\n"
-                        f"🎨 [bold white]Visual Economy & Camera Style:[/bold white]\n{info.visual_style}\n\n"
-                        f"🧠 [bold white]Thematic Core & Philosophy:[/bold white]\n{info.thematic_core}"
-                    )
-                )
+        static_content = Static(
+            f"💬 [bold white]Quote:[/bold white]\n[italic]\"{info.quote}\"[/italic]\n\n"
+            f"🎨 [bold white]Visual Economy & Camera Style:[/bold white]\n{info.visual_style}\n\n"
+            f"🧠 [bold white]Thematic Core & Philosophy:[/bold white]\n{info.thematic_core}"
+        )
+        result_box = Container(static_content, classes="result-box")
+        scroll = VerticalScroll(result_box)
 
-        with Horizontal(id="nav-bar"):
-            body.mount(
-                Button(
-                    f"Activate {info.director_name} Constraints",
-                    id="activate_quiz_btn",
-                    variant="primary",
-                )
-            )
-            body.mount(Button("Close / Skip", id="close_quiz_btn", variant="default"))
+        nav_buttons = [
+            Button(
+                f"Activate {info.director_name} Constraints",
+                id="activate_quiz_btn",
+                variant="primary",
+            ),
+            Button("Close / Skip", id="close_quiz_btn", variant="default"),
+        ]
+        nav = Horizontal(*nav_buttons, classes="quiz-nav-bar")
+
+        body.mount(header_label, director_label, tagline_label, scroll, nav)
 
     def action_cancel(self) -> None:
         self.dismiss(None)
