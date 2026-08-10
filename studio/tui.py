@@ -11,9 +11,11 @@ from textual.widgets import Button, Footer, Header, Label, Static
 from studio.inference import InferenceEngine, InferenceError
 from studio.models.draw import FridayDraw
 from studio.models.profile import TeamProfile
+from studio.models.treatment import TreatmentOutput
 from studio.screens import ApiSettingsScreen, DrawWizardScreen, ProfileSetupScreen
 from studio.screens_library import ConstraintLibraryScreen
 from studio.screens_quiz import OnboardingQuizScreen
+from studio.screens_workspace import WorkspaceManagerScreen
 from studio.utils.draw_store import load_draw
 from studio.utils.global_state import get_active_workspace
 from studio.utils.profile_store import load_profile
@@ -68,8 +70,6 @@ class HeaderHUD(Static):
 class NavigationSidebar(Static):
     """Persistent Left Navigation Sidebar widget."""
 
-    profile: reactive[Optional[TeamProfile]] = reactive(None)
-
     DEFAULT_CSS = """
     NavigationSidebar {
         width: 34;
@@ -86,51 +86,14 @@ class NavigationSidebar(Static):
     }
     """
 
-    def watch_profile(self, profile: Optional[TeamProfile]) -> None:
-        self.update_content()
-
-    def on_mount(self) -> None:
-        self.update_content()
-
     def compose(self) -> ComposeResult:
         yield Button("👤 Profile Setup [P]", id="btn_profile_modal", variant="default")
-        yield Button("🎲 Friday Draw [D]", id="btn_draw_modal", variant="primary")
+        yield Button("📂 Workspace Manager [W]", id="btn_workspace_modal", variant="default")
         yield Button("🔮 Filmmaker Quiz [Z]", id="btn_quiz_modal", variant="default")
         yield Button("📚 Constraints [L]", id="btn_library_modal", variant="default")
+        yield Button("🎲 Friday Draw [D]", id="btn_draw_modal", variant="primary")
         yield Button("⚙️ Settings [S]", id="btn_settings_modal", variant="default")
 
-    def update_content(self) -> None:
-        ws = get_active_workspace()
-        ws_info = f"[bold cyan]{ws.name}[/bold cyan]" if ws else "[dim]Unset (CWD)[/dim]"
-
-        if self.profile:
-            team_info = f"[bold green]{self.profile.team_name}[/bold green]"
-            admin_info = f"Admin: [cyan]{self.profile.admin_username}[/cyan]"
-            log_c = self.profile.active_logistical_constraint or "None"
-            dir_v = self.profile.active_directorial_vision or "None"
-            them_f = self.profile.active_thematic_framework or "None"
-            idea_s = self.profile.active_idea_seed or "None"
-            constraint_info = (
-                f"Logistics: [yellow]{log_c}[/yellow]\n"
-                f"Directorial: [magenta]{dir_v}[/magenta]\n"
-                f"Thematic: [blue]{them_f}[/blue]\n"
-                f"Idea Seed: [green]{idea_s}[/green]"
-            )
-        else:
-            team_info = "[dim]Team: Unconfigured[/dim]"
-            admin_info = "[dim]Admin: N/A[/dim]"
-            constraint_info = "[dim]Constraints: None[/dim]"
-
-        content = (
-            "🧭 [bold cyan]NAVIGATION[/bold cyan]\n\n"
-            "📂 [bold white]PROJECT WORKSPACE[/bold white]\n"
-            f"• Workspace: {ws_info}\n\n"
-            "👤 [bold white]TEAM STATUS[/bold white]\n"
-            f"• {team_info}\n"
-            f"• {admin_info}\n"
-            f"• {constraint_info}\n"
-        )
-        self.update(content)
 
 
 class StudioApp(App):
@@ -142,6 +105,9 @@ class StudioApp(App):
     app_draw: reactive[Optional[FridayDraw]] = reactive(None)
     current_markdown: reactive[str] = reactive(DEFAULT_WELCOME_MARKDOWN)
     is_generating: reactive[bool] = reactive(False)
+    current_treatment_obj: reactive[Optional[TreatmentOutput]] = reactive(None)
+    current_prompt_text: reactive[Optional[str]] = reactive(None)
+    is_revising: reactive[bool] = reactive(False)
 
     CSS = """
     Screen {
@@ -157,15 +123,17 @@ class StudioApp(App):
     """
 
     BINDINGS = [
-        ("d", "open_draw_wizard", "Friday Draw"),
         ("p", "open_profile_setup", "Profile Setup"),
+        ("w", "open_workspace_manager", "Workspace Manager"),
         ("z", "open_quiz", "Filmmaker Quiz"),
         ("l", "open_library", "Constraint Library"),
+        ("d", "open_draw_wizard", "Friday Draw"),
         ("s", "open_api_settings", "API Settings"),
         ("g", "generate_treatment", "Generate Treatment"),
         ("q", "quit", "Quit"),
         ("ctrl+c", "quit", "Quit"),
     ]
+
 
     def compose(self) -> ComposeResult:
         """Compose the 3-zone layout: Header HUD, Left Sidebar, Main Workspace."""
@@ -211,9 +179,27 @@ class StudioApp(App):
         except Exception:
             pass
 
+    def watch_current_treatment_obj(self, treatment: Optional[TreatmentOutput]) -> None:
+        """Push current_treatment_obj state down to workspace."""
+        try:
+            self.query_one(StudioWorkspace).has_treatment = (treatment is not None)
+        except Exception:
+            pass
+
+    def watch_is_revising(self, is_revising: bool) -> None:
+        """Push is_revising state down to workspace."""
+        try:
+            self.query_one(StudioWorkspace).is_revising = is_revising
+        except Exception:
+            pass
+
     def action_open_draw_wizard(self) -> None:
         """Push the DrawWizardScreen modal."""
         self.push_screen(DrawWizardScreen(self.app_draw), callback=self.update_draw)
+
+    def action_open_workspace_manager(self) -> None:
+        """Push the WorkspaceManagerScreen modal."""
+        self.push_screen(WorkspaceManagerScreen(), callback=self.update_workspace)
 
     def action_open_profile_setup(self) -> None:
         """Push the ProfileSetupScreen modal."""
@@ -230,6 +216,7 @@ class StudioApp(App):
     def action_open_api_settings(self) -> None:
         """Push the ApiSettingsScreen modal."""
         self.push_screen(ApiSettingsScreen())
+
 
     @work(thread=True)
     def action_generate_treatment(self) -> None:
@@ -256,7 +243,7 @@ class StudioApp(App):
             md_content = convert_treatment_to_markdown(treatment, prompt_text=prompt)
             header = f"> 💾 **Saved to:** `{saved_path}`\n\n"
             final_md = header + md_content
-            self.call_from_thread(self._on_treatment_success, final_md, str(saved_path))
+            self.call_from_thread(self._on_treatment_success, final_md, str(saved_path), treatment, prompt)
         except InferenceError as err:
             err_msg = str(err)
             error_md = (
@@ -273,10 +260,71 @@ class StudioApp(App):
             )
             self.call_from_thread(self._on_treatment_error, error_md, err_msg)
 
+    @work(thread=True)
+    def action_revise_treatment(self) -> None:
+        """Revise current treatment with user notes in background worker thread."""
+        if not self.current_treatment_obj:
+            self.notify("No active treatment to revise.", title="Revision Error", severity="error")
+            return
+
+        notes = ""
+        try:
+            from textual.widgets import TextArea
+            from studio.workspace import RevisionPane
+            rev_pane = self.query_one(RevisionPane)
+            notes_ta = rev_pane.query_one("#revision_notes_input", TextArea)
+            notes = notes_ta.text
+        except Exception:
+            pass
+
+        if not notes or not notes.strip():
+            self.notify("Please enter revision notes before submitting.", title="Revision Note Required", severity="warning")
+            return
+
+        self.call_from_thread(self._set_revising_state, True)
+
+        try:
+            revised_prompt = PromptBuilder.compile_revision_prompt(
+                current_treatment=self.current_treatment_obj,
+                notes=notes,
+                original_prompt=self.current_prompt_text,
+                draw=self.app_draw,
+                profile=self.app_profile,
+            )
+            revised_treatment = InferenceEngine.generate_treatment(prompt=revised_prompt)
+            saved_path = save_treatment_output(revised_treatment, prompt_text=revised_prompt)
+            md_content = convert_treatment_to_markdown(revised_treatment, prompt_text=revised_prompt)
+            header = f"> 💾 **Saved to:** `{saved_path}`\n\n"
+            final_md = header + md_content
+            self.call_from_thread(
+                self._on_revision_success,
+                final_md,
+                str(saved_path),
+                revised_treatment,
+                revised_prompt,
+            )
+        except InferenceError as err:
+            err_msg = str(err)
+            self.call_from_thread(self._on_revision_error, err_msg)
+        except Exception as err:
+            err_msg = str(err)
+            self.call_from_thread(self._on_revision_error, err_msg)
+
     def _set_generating_state(self, state: bool) -> None:
         self.is_generating = state
 
-    def _on_treatment_success(self, md_content: str, saved_path: str) -> None:
+    def _set_revising_state(self, state: bool) -> None:
+        self.is_revising = state
+
+    def _on_treatment_success(
+        self,
+        md_content: str,
+        saved_path: str,
+        treatment: TreatmentOutput,
+        prompt: str,
+    ) -> None:
+        self.current_treatment_obj = treatment
+        self.current_prompt_text = prompt
         self.current_markdown = md_content
         self.is_generating = False
         self.notify(
@@ -294,6 +342,40 @@ class StudioApp(App):
             severity="error",
         )
 
+    def _on_revision_success(
+        self,
+        md_content: str,
+        saved_path: str,
+        treatment: TreatmentOutput,
+        prompt: str,
+    ) -> None:
+        self.current_treatment_obj = treatment
+        self.current_prompt_text = prompt
+        self.current_markdown = md_content
+        self.is_revising = False
+        try:
+            from textual.widgets import TextArea
+            from studio.workspace import RevisionPane
+            rev_pane = self.query_one(RevisionPane)
+            notes_ta = rev_pane.query_one("#revision_notes_input", TextArea)
+            notes_ta.text = ""
+        except Exception:
+            pass
+
+        self.notify(
+            f"Revised treatment saved to {saved_path}",
+            title="Treatment Revised",
+            severity="information",
+        )
+
+    def _on_revision_error(self, err_msg: str) -> None:
+        self.is_revising = False
+        self.notify(
+            f"Revision failed: {err_msg}",
+            title="Revision Error",
+            severity="error",
+        )
+
     def update_draw(self, new_draw: Optional[FridayDraw]) -> None:
         """Callback invoked when DrawWizardScreen is dismissed."""
         if new_draw is not None:
@@ -304,20 +386,41 @@ class StudioApp(App):
         if new_profile is not None:
             self.app_profile = load_profile() or new_profile
 
+    def update_workspace(self, new_workspace: Optional[Path]) -> None:
+        """Callback invoked when WorkspaceManagerScreen is dismissed."""
+        if new_workspace is not None:
+            self.app_profile = load_profile()
+            self.app_draw = load_draw()
+            try:
+                self.query_one(HeaderHUD).update_content()
+            except Exception:
+                pass
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button presses from sidebar or workspace."""
-        if event.button.id == "btn_draw_modal":
-            self.action_open_draw_wizard()
-        elif event.button.id == "btn_profile_modal":
+        if event.button.id == "btn_profile_modal":
             self.action_open_profile_setup()
+        elif event.button.id == "btn_workspace_modal":
+            self.action_open_workspace_manager()
         elif event.button.id == "btn_quiz_modal":
             self.action_open_quiz()
         elif event.button.id == "btn_library_modal":
             self.action_open_library()
+        elif event.button.id == "btn_draw_modal":
+            self.action_open_draw_wizard()
         elif event.button.id == "btn_settings_modal":
             self.action_open_api_settings()
         elif event.button.id == "btn_generate_treatment":
             self.action_generate_treatment()
+        elif event.button.id == "btn_submit_revision":
+            self.action_revise_treatment()
+
+
+if __name__ == "__main__":
+    app = StudioApp()
+    app.run()
+
+
 
 
 if __name__ == "__main__":

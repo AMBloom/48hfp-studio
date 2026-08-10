@@ -167,6 +167,5 @@ def test_tui_workspace_hud_rendering(tmp_path):
     assert "Workspace: TUI_Project" in rendered_hud
 
     sidebar = NavigationSidebar()
-    sidebar.update_content()
-    # verify render/update doesn't crash and contains workspace section
     assert sidebar is not None
+

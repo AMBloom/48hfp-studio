@@ -263,35 +263,57 @@ def seed_default_constraints() -> Tuple[Optional[Path], Optional[Path], Optional
     thematic_path = None
     ideas_path = None
 
-    if not list_logistical_constraints():
-        default_logistical = LogisticalConstraint(
-            name="interior_indie_crew",
-            description="Default indoor indie shoot setup with a small crew and kitchen/living room locations.",
-            locations=["Interior", "Apartment", "Day/Night"],
-            sub_locations=["Living Room", "Kitchen", "Hallway", "Balcony"],
-            location_details="Natural daylight through living room windows. Kitchen equipped with island counter and fluorescent overheads.",
-            main_character_details=CharacterDetail(
-                name="Protagonist",
-                actor_traits="Late 20s - Early 30s, expressive eyes, casual clothing",
-                wardrobe="Faded denim jacket, graphic tee, sneakers",
-                notes="Resourceful but anxious under pressure",
-            ),
-            other_characters=[
-                CharacterDetail(
-                    name="Eclectic Neighbor",
-                    actor_traits="40s, eccentric posture, loud voice",
-                    wardrobe="Bright bathrobe or oversized vintage cardigan",
-                    notes="Provides unexpected plot exposition",
-                )
-            ],
-            props_and_dialogue=[
-                "Vintage coffee mug",
-                "Flickering table lamp",
-                "Unopened letter on kitchen counter",
-                "Running Joke: 'Did anyone actually remember the coffee?'",
-            ],
-        )
-        logistical_path = save_logistical_constraint(default_logistical)
+    logistical_setups = [
+        LogisticalConstraint(
+            name="upper_middle_class_residence",
+            locations=["Interior", "Suburbs", "Day/Night"],
+            sub_locations=["Open-concept Kitchen", "Master Bathroom", "Living Room"],
+            location_details="Large windows providing ample natural bounce light, high ceilings. The bathroom features a modern one-piece continuous mold toilet without a detachable tank.",
+            available_set_dressing=["Stainless steel appliances", "Minimalist wall art", "Large kitchen island"],
+        ),
+        LogisticalConstraint(
+            name="shabby_apartment",
+            locations=["Interior", "Urban", "Day/Night"],
+            sub_locations=["Galley Kitchen", "Fire Escape", "Cramped Bedroom"],
+            location_details="Thin walls with potential audio bleed, uneven practical lighting, exposed radiators, and tight corners for camera placement.",
+            available_set_dressing=["Piles of unopened mail", "Mismatched coffee mugs", "Fading, sunken couch"],
+        ),
+        LogisticalConstraint(
+            name="public_park_sports_court",
+            locations=["Exterior", "Park", "Day"],
+            sub_locations=["Basketball Court", "Park Bench", "Parking Lot"],
+            location_details="Variable weather and lighting conditions, uncontrolled background extras, ambient wind, and distant traffic noise.",
+            available_set_dressing=["Chainlink fences", "A parked 2022 Honda Accord 2.0T Sport sedan", "Abandoned basketball"],
+        ),
+        LogisticalConstraint(
+            name="office_building",
+            locations=["Interior", "Commercial", "Day/Night"],
+            sub_locations=["Cubicle Farm", "Breakroom", "Elevator Bank"],
+            location_details="Harsh, flat fluorescent overhead lighting, repetitive geometric lines, and the constant quiet hum of an HVAC system.",
+            available_set_dressing=["Water cooler", "Stacks of printer paper", "Ergonomic rolling chairs"],
+        ),
+        LogisticalConstraint(
+            name="college_lecture_hall",
+            locations=["Interior", "Campus", "Day/Night"],
+            sub_locations=["Podium", "Back Row", "Hallway"],
+            location_details="Highly echoey acoustics requiring tight mic placement, large projector screens, and often a lack of natural windows.",
+            available_set_dressing=["Expansive whiteboards", "Scattered abandoned notebooks", "Podium microphone"],
+        ),
+        LogisticalConstraint(
+            name="local_museum_or_gallery",
+            locations=["Interior", "Civic", "Day"],
+            sub_locations=["Main Exhibit Hall", "Lobby", "Gift Shop"],
+            location_details="Hardwood or polished concrete floors, highly controlled directional spotlighting, and hushed acoustics.",
+            available_set_dressing=["Display pedestals", "Velvet stanchion ropes", "Framed canvases"],
+        ),
+    ]
+
+    for setup in logistical_setups:
+        if not load_logistical_constraint(setup.name):
+            p = save_logistical_constraint(setup)
+            if logistical_path is None:
+                logistical_path = p
+
 
     if not list_idea_seeds():
         default_idea = IdeaSeed(

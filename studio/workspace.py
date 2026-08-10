@@ -155,11 +155,89 @@ class RecipePane(Static):
         content_widget.refresh()
 
 
+class RevisionPane(Static):
+    """Bottom container docked in OutputPane for submitting treatment revision requests."""
+
+    is_revising: reactive[bool] = reactive(False)
+
+    DEFAULT_CSS = """
+    RevisionPane {
+        dock: bottom;
+        height: auto;
+        background: $surface;
+        border-top: heavy $accent;
+        padding: 1;
+        layout: vertical;
+    }
+
+    #revision_notes_label {
+        color: $text;
+        text-style: bold;
+        margin-bottom: 0;
+    }
+
+    #revision_notes_input {
+        height: 3;
+        margin-top: 1;
+        margin-bottom: 1;
+    }
+
+    #btn_submit_revision {
+        width: 100%;
+    }
+
+    #revision_loading {
+        height: 3;
+        content-align: center middle;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield Label("✏️ [bold yellow]REVISE TREATMENT[/bold yellow]", id="revision_notes_label")
+        yield TextArea(
+            placeholder="Give notes (e.g., 'Make the ending darker', 'Add a scene at the harbor')...",
+            id="revision_notes_input",
+        )
+        yield Button(
+            "🔄 Submit Revision",
+            id="btn_submit_revision",
+            variant="primary",
+        )
+        yield LoadingIndicator(id="revision_loading")
+
+    def on_mount(self) -> None:
+        self.apply_revising_state()
+
+    def watch_is_revising(self, is_rev: bool) -> None:
+        self.apply_revising_state()
+
+    def apply_revising_state(self) -> None:
+        try:
+            loader = self.query_one("#revision_loading", LoadingIndicator)
+            notes_input = self.query_one("#revision_notes_input", TextArea)
+            btn = self.query_one("#btn_submit_revision", Button)
+            lbl = self.query_one("#revision_notes_label", Label)
+            if self.is_revising:
+                loader.display = True
+                notes_input.display = False
+                btn.display = False
+                lbl.display = False
+            else:
+                loader.display = False
+                notes_input.display = True
+                btn.display = True
+                lbl.display = True
+        except Exception:
+            pass
+
+
 class OutputPane(Static):
     """Right Split Pane displaying the generated Markdown treatment or loading indicator."""
 
     markdown_text: reactive[str] = reactive(DEFAULT_WELCOME_MARKDOWN)
     is_generating: reactive[bool] = reactive(False)
+    has_treatment: reactive[bool] = reactive(False)
+    is_revising: reactive[bool] = reactive(False)
 
     DEFAULT_CSS = """
     OutputPane {
@@ -168,10 +246,11 @@ class OutputPane(Static):
         background: $background;
         color: $text;
         padding: 1 2;
+        layout: vertical;
     }
 
     #output-scroll {
-        height: 100%;
+        height: 1fr;
     }
 
     #treatment-loading {
@@ -185,9 +264,11 @@ class OutputPane(Static):
         with VerticalScroll(id="output-scroll"):
             yield LoadingIndicator(id="treatment-loading")
             yield Markdown(self.markdown_text, id="treatment-markdown")
+        yield RevisionPane(id="revision-pane")
 
     def on_mount(self) -> None:
         self.apply_generating_state()
+        self.apply_has_treatment_state()
 
     def watch_markdown_text(self, new_text: str) -> None:
         try:
@@ -198,6 +279,23 @@ class OutputPane(Static):
 
     def watch_is_generating(self, is_gen: bool) -> None:
         self.apply_generating_state()
+
+    def watch_has_treatment(self, has_tx: bool) -> None:
+        self.apply_has_treatment_state()
+
+    def watch_is_revising(self, is_rev: bool) -> None:
+        try:
+            rev_pane = self.query_one(RevisionPane)
+            rev_pane.is_revising = is_rev
+        except Exception:
+            pass
+
+    def apply_has_treatment_state(self) -> None:
+        try:
+            rev_pane = self.query_one(RevisionPane)
+            rev_pane.display = self.has_treatment
+        except Exception:
+            pass
 
     def apply_generating_state(self) -> None:
         try:
@@ -220,6 +318,8 @@ class StudioWorkspace(Static):
     draw: reactive[Optional[FridayDraw]] = reactive(None)
     markdown_text: reactive[str] = reactive(DEFAULT_WELCOME_MARKDOWN)
     is_generating: reactive[bool] = reactive(False)
+    has_treatment: reactive[bool] = reactive(False)
+    is_revising: reactive[bool] = reactive(False)
 
     DEFAULT_CSS = """
     StudioWorkspace {
@@ -264,9 +364,22 @@ class StudioWorkspace(Static):
         except Exception:
             pass
 
+    def watch_has_treatment(self, has_tx: bool) -> None:
+        try:
+            self.query_one(OutputPane).has_treatment = has_tx
+        except Exception:
+            pass
+
+    def watch_is_revising(self, is_rev: bool) -> None:
+        try:
+            self.query_one(OutputPane).is_revising = is_rev
+        except Exception:
+            pass
+
     def update_content(self) -> None:
         """Trigger update_content on child RecipePane for backward compatibility."""
         try:
             self.query_one(RecipePane).update_content()
         except Exception:
             pass
+

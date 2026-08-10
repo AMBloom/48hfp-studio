@@ -6,7 +6,8 @@ from studio.models.profile import TeamProfile
 from studio.models.draw import FridayDraw
 from studio.tui import StudioApp, HeaderHUD, NavigationSidebar, StudioWorkspace
 from studio.workspace import RecipePane
-from textual.widgets import Static
+from textual.widgets import Button, Static
+
 
 
 @pytest.fixture
@@ -49,11 +50,9 @@ async def test_studio_app_on_mount_initialization(sample_profile, sample_draw):
             assert app.app_profile == sample_profile
             assert app.app_draw == sample_draw
 
-            sidebar = app.query_one(NavigationSidebar)
             workspace = app.query_one(StudioWorkspace)
             header = app.query_one(HeaderHUD)
 
-            assert sidebar.profile == sample_profile
             assert workspace.draw == sample_draw
             assert header.profile == sample_profile
 
@@ -66,38 +65,29 @@ async def test_reactive_watchers_propagation(sample_profile, sample_draw):
     ):
         app = StudioApp()
         async with app.run_test():
-            sidebar = app.query_one(NavigationSidebar)
             workspace = app.query_one(StudioWorkspace)
             header = app.query_one(HeaderHUD)
 
-            assert sidebar.profile is None
             assert workspace.draw is None
 
             # Mutate reactive state on parent app
             app.app_profile = sample_profile
             app.app_draw = sample_draw
 
-            assert sidebar.profile == sample_profile
             assert workspace.draw == sample_draw
             assert header.profile == sample_profile
 
 
 @pytest.mark.anyio
 async def test_sidebar_dynamic_rendering(sample_profile):
-    """Verify NavigationSidebar dynamic content when profile is set vs None."""
+    """Verify NavigationSidebar renders navigation buttons."""
     app = StudioApp()
     async with app.run_test():
         sidebar = app.query_one(NavigationSidebar)
-        sidebar.profile = None
-        sidebar.update_content()
-        assert "Unconfigured" in str(sidebar.render())
+        btn_ids = [b.id for b in sidebar.query(Button)]
+        assert "btn_workspace_modal" in btn_ids
+        assert "btn_profile_modal" in btn_ids
 
-        sidebar.profile = sample_profile
-        sidebar.update_content()
-        assert "Cyber Directors" in str(sidebar.render())
-        assert "alex_admin" in str(sidebar.render())
-        assert "SF Locations" in str(sidebar.render())
-        assert "Sci-Fi Toolkit" in str(sidebar.render())
 
 
 @pytest.mark.anyio

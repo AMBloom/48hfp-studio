@@ -14,6 +14,7 @@ from studio.models.constraints import (
 )
 from studio.models.draw import FridayDraw
 from studio.models.profile import TeamProfile
+from studio.models.treatment import TreatmentOutput
 from studio.utils.constraint_store import (
     load_directorial_vision,
     load_idea_seed,
@@ -103,6 +104,60 @@ class PromptBuilder:
         sections.append(cls._build_immutable_rules_section(final_draw))
 
         return "\n\n".join(sections)
+
+    @classmethod
+    def compile_revision_prompt(
+        cls,
+        current_treatment: TreatmentOutput,
+        notes: str,
+        original_prompt: Optional[str] = None,
+        draw: Optional[FridayDraw] = None,
+        profile: Optional[TeamProfile] = None,
+    ) -> str:
+        """Compile a revision prompt ensuring Recency Effect (Immutable Rules at absolute bottom)
+
+        and stateless token conservation (single latest draft + newest note).
+        """
+        # Resolve base system prompt
+        source_prompt = original_prompt or cls.compile_system_prompt(draw=draw, profile=profile)
+
+        rules_marker = "================================================================================\n8. IMMUTABLE FESTIVAL RULES"
+        if rules_marker in source_prompt:
+            parts = source_prompt.split(rules_marker, 1)
+            main_part = parts[0].rstrip()
+            rules_section = rules_marker + parts[1]
+        else:
+            main_part = source_prompt.strip()
+            final_draw = draw or load_draw()
+            rules_section = cls._build_immutable_rules_section(final_draw)
+
+        # Strip out any prior revision directives to enforce stateless single-draft payload
+        rev_marker = "================================================================================\nREVISION DIRECTIVES & PREVIOUS DRAFT"
+        if rev_marker in main_part:
+            base_part = main_part.split(rev_marker, 1)[0].rstrip()
+        else:
+            base_part = main_part.rstrip()
+
+        treatment_json = current_treatment.model_dump_json(indent=2)
+        revision_section = (
+            "================================================================================\n"
+            "REVISION DIRECTIVES & PREVIOUS DRAFT\n"
+            "================================================================================\n"
+            "Below is the SINGLE MOST RECENT DRAFT of the film treatment in JSON format:\n\n"
+            "```json\n"
+            f"{treatment_json}\n"
+            "```\n\n"
+            "FILMMAKER REVISION NOTES / CHANGE REQUESTS:\n"
+            f"\"{notes.strip()}\"\n\n"
+            "REVISION INSTRUCTIONS:\n"
+            "1. Update the film treatment according to the filmmaker's revision notes.\n"
+            "2. Preserve all existing elements that do not conflict with the notes.\n"
+            "3. You MUST continue to strictly satisfy all festival rules, character requirements, prop usages, and verbatim line mandates.\n"
+            "4. Your output MUST strictly match the required TreatmentOutput JSON schema."
+        )
+
+        return f"{base_part}\n\n{revision_section}\n\n{rules_section}"
+
 
     @staticmethod
     def _build_persona_section() -> str:

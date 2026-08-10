@@ -152,7 +152,7 @@ def test_seed_default_constraints(tmp_path):
         assert p_them is not None and p_them.exists()
         assert p_idea is not None and p_idea.exists()
 
-        assert len(list_logistical_constraints()) == 1
+        assert len(list_logistical_constraints()) == 6
         assert len(list_directorial_visions()) == 12
         assert len(list_thematic_frameworks()) == 12
         assert len(list_idea_seeds()) == 1

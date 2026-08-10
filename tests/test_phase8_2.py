@@ -3,19 +3,34 @@
 from pathlib import Path
 from typer.testing import CliRunner
 
+import pytest
+
 from studio.cli_workspace import workspace_app
 from studio.models.profile import TeamProfile
 from studio.quiz import ARCHETYPE_LIBRARY, QUIZ_QUESTIONS, QuizEngine
 from studio.screens_quiz import OnboardingQuizScreen
 from studio.utils.constraint_store import (
     load_directorial_vision,
+    load_logistical_constraint,
     load_thematic_framework,
     seed_default_constraints,
 )
-from studio.utils.global_state import set_active_workspace
+from studio.utils.global_state import clear_active_workspace, set_active_workspace
 from studio.utils.profile_store import load_profile
 
 runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def clean_global_state(tmp_path, monkeypatch):
+    """Fixture ensuring a isolated global_state file and workspace for every test."""
+    dummy_state_file = tmp_path / "global_state.yaml"
+    monkeypatch.setattr("studio.utils.global_state.GLOBAL_STATE_FILE", dummy_state_file)
+    monkeypatch.setattr("studio.utils.global_state.GLOBAL_STATE_DIR", tmp_path)
+    clear_active_workspace()
+    yield
+    clear_active_workspace()
+
 
 
 def test_seed_all_12_director_archetypes(tmp_path: Path) -> None:
@@ -49,6 +64,30 @@ def test_seed_all_12_director_archetypes(tmp_path: Path) -> None:
         assert them_f is not None, f"ThematicFramework missing for slug {slug}"
         assert them_f.name == slug
         assert len(them_f.core_philosophy) > 0
+
+
+def test_seed_all_6_logistical_constraints(tmp_path: Path) -> None:
+    """Test that seed_default_constraints generates all 6 logistical constraint sets."""
+    set_active_workspace(tmp_path)
+    seed_default_constraints()
+
+    expected_slugs = [
+        "upper_middle_class_residence",
+        "shabby_apartment",
+        "public_park_sports_court",
+        "office_building",
+        "college_lecture_hall",
+        "local_museum_or_gallery",
+    ]
+
+    for slug in expected_slugs:
+        c = load_logistical_constraint(slug)
+        assert c is not None, f"LogisticalConstraint missing for slug {slug}"
+        assert c.name == slug
+        assert len(c.locations) > 0
+        assert len(c.sub_locations) > 0
+        assert len(c.location_details) > 0
+        assert len(c.available_set_dressing) > 0
 
 
 def test_quiz_engine_reachability_all_12_directors() -> None:
@@ -107,7 +146,6 @@ def test_tui_quiz_modal_instantiation() -> None:
     assert res.winner_slug in ARCHETYPE_LIBRARY
 
 
-import pytest
 from studio.tui import StudioApp
 
 

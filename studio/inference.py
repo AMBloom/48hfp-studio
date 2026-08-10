@@ -29,6 +29,29 @@ class InferenceEngine:
     MAX_RETRIES = 3
 
     @classmethod
+    def revise_treatment(
+        cls,
+        current_treatment: TreatmentOutput,
+        notes: str,
+        original_prompt: Optional[str] = None,
+        model_name: Optional[str] = None,
+        api_key: Optional[str] = None,
+    ) -> TreatmentOutput:
+        """Revise an existing film treatment based on user notes and original prompt context."""
+        from studio.utils.prompt_builder import PromptBuilder
+
+        revised_prompt = PromptBuilder.compile_revision_prompt(
+            current_treatment=current_treatment,
+            notes=notes,
+            original_prompt=original_prompt,
+        )
+        return cls.generate_treatment(
+            prompt=revised_prompt,
+            model_name=model_name,
+            api_key=api_key,
+        )
+
+    @classmethod
     def generate_treatment(
         cls,
         prompt: str,

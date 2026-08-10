@@ -136,6 +136,19 @@ class ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]]):
         them_table = self.query_one("#thematic_table", DataTable)
         idea_table = self.query_one("#ideas_table", DataTable)
 
+        def get_current_key(table: DataTable) -> Optional[str]:
+            if table.row_count > 0 and table.cursor_row is not None:
+                try:
+                    return str(table.get_cell_at((table.cursor_row, 0)))
+                except Exception:
+                    pass
+            return None
+
+        log_key = get_current_key(log_table)
+        dir_key = get_current_key(dir_table)
+        them_key = get_current_key(them_table)
+        idea_key = get_current_key(idea_table)
+
         log_table.clear()
         dir_table.clear()
         them_table.clear()
@@ -166,6 +179,19 @@ class ConstraintLibraryScreen(ModalScreen[Optional[TeamProfile]]):
             status = "✅ ACTIVE" if active_idea and c.name == active_idea else ""
             inc = c.inciting_incident[:30] + "..." if len(c.inciting_incident) > 30 else c.inciting_incident or "N/A"
             idea_table.add_row(c.name, inc, status, key=c.name)
+
+        def restore_cursor(table: DataTable, key: Optional[str]) -> None:
+            if key and table.row_count > 0:
+                try:
+                    row_idx = table.get_row_index(key)
+                    table.move_cursor(row=row_idx)
+                except Exception:
+                    pass
+
+        restore_cursor(log_table, log_key)
+        restore_cursor(dir_table, dir_key)
+        restore_cursor(them_table, them_key)
+        restore_cursor(idea_table, idea_key)
 
     def _get_active_category(self) -> str:
         """Return the category string corresponding to the currently active TabPane."""
