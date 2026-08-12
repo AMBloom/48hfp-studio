@@ -158,6 +158,81 @@ class PromptBuilder:
 
         return f"{base_part}\n\n{revision_section}\n\n{rules_section}"
 
+    @classmethod
+    def compile_screenplay_prompt(
+        cls,
+        treatment: TreatmentOutput,
+        draw: Optional[FridayDraw] = None,
+        profile: Optional[TeamProfile] = None,
+        additional_instructions: Optional[str] = None,
+    ) -> str:
+        """Compile a screenplay prompt that instructs the LLM to interpret the active treatment
+
+        into a complete, Hollywood-ready screenplay strictly formatted in Fountain markup syntax (.fountain).
+        """
+        final_draw = draw or load_draw()
+        final_profile = profile or load_profile()
+
+        sections = []
+
+        # Persona & Objective
+        sections.append(
+            "================================================================================\n"
+            "SCREENPLAY GENERATION DIRECTIVE (.FOUNTAIN FORMAT)\n"
+            "================================================================================\n"
+            "You are a master Hollywood screenwriter. Your task is to adapt the provided film treatment\n"
+            "into a complete, professional, 100% production-ready short film screenplay in standard FOUNTAIN markup.\n"
+            "Target screenplay length: approximately 4 to 6 pages (aiming for a 4 to 7 minute short film)."
+        )
+
+        # Global Team State
+        sections.append(cls._build_global_state_section(final_profile))
+
+        # Treatment Context
+        treatment_markdown = treatment.model_dump_json(indent=2)
+        sections.append(
+            "================================================================================\n"
+            "SOURCE FILM TREATMENT (JSON PAYLOAD)\n"
+            "================================================================================\n"
+            "Base your screenplay directly on the characters, plot, beats, and scene breakdown below:\n\n"
+            "```json\n"
+            f"{treatment_markdown}\n"
+            "```"
+        )
+
+        # Additional Directives if present
+        if additional_instructions and additional_instructions.strip():
+            sections.append(
+                "================================================================================\n"
+                "ADDITIONAL FILMMAKER DIRECTIVES\n"
+                "================================================================================\n"
+                f"{additional_instructions.strip()}"
+            )
+
+        # Fountain Syntax Rules & Strict Output Directives
+        sections.append(
+            "================================================================================\n"
+            "FOUNTAIN FORMATTING DIRECTIVES & STRICT OUTPUT RULES\n"
+            "================================================================================\n"
+            "Strictly follow standard Fountain screenplay syntax:\n"
+            "1. SCENE HEADINGS: Must begin with INT., EXT., EST., INT./EXT., or EXT./INT. in ALL CAPS.\n"
+            "2. CHARACTER NAMES: Must be in ALL CAPS on a single line preceding dialogue.\n"
+            "3. PARENTHETICALS: Must be enclosed in parentheses (parenthetical) on a line below character name.\n"
+            "4. DIALOGUE: Appears directly below character name / parenthetical.\n"
+            "5. ACTION / BLOCKING: Standard sentence case describing character actions, camera, and props.\n"
+            "6. TRANSITIONS: ALL CAPS ending with TO: (e.g. CUT TO:).\n\n"
+            "CRITICAL OUTPUT MANDATE:\n"
+            "• Output ONLY the pure raw .fountain screenplay text.\n"
+            "• DO NOT wrap your response in markdown code fences (no ```fountain or ```).\n"
+            "• DO NOT include introductory greetings, system prompt appendices, or trailing commentary."
+        )
+
+        # Friday Draw & Immutable Festival Rules (Recency Effect - Absolute Bottom)
+        sections.append(cls._build_draw_section(final_draw))
+        sections.append(cls._build_immutable_rules_section(final_draw))
+
+        return "\n\n".join(sections)
+
 
     @staticmethod
     def _build_persona_section() -> str:

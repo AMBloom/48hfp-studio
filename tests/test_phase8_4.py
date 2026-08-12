@@ -40,6 +40,7 @@ def test_workspace_sidebar_button_order() -> None:
     expected_ids = [
         "btn_profile_modal",
         "btn_workspace_modal",
+        "btn_load_drafts",
         "btn_quiz_modal",
         "btn_library_modal",
         "btn_draw_modal",

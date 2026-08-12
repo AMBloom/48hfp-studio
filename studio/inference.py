@@ -52,6 +52,82 @@ class InferenceEngine:
         )
 
     @classmethod
+    def generate_screenplay(
+        cls,
+        prompt: str,
+        model_name: Optional[str] = None,
+        api_key: Optional[str] = None,
+    ) -> str:
+        """Generate a raw Fountain screenplay string using Gemini API.
+
+        Args:
+            prompt: The compiled screenplay prompt string.
+            model_name: Optional model override.
+            api_key: Optional API key override.
+
+        Returns:
+            str: Clean Fountain screenplay text.
+
+        Raises:
+            InferenceError: If API key is missing or network fails.
+        """
+        from studio.utils.screenplay_store import clean_fountain_text
+
+        resolved_api_key = api_key or os.environ.get("GEMINI_API_KEY")
+        if not resolved_api_key:
+            raise InferenceError(
+                "Missing GEMINI_API_KEY environment variable.\n"
+                "Please set GEMINI_API_KEY in your environment or .env file before running screenplay generation."
+            )
+
+        resolved_model = (
+            model_name or os.environ.get("GEMINI_MODEL") or cls.DEFAULT_MODEL
+        )
+
+        last_exception = None
+        for attempt in range(1, cls.MAX_RETRIES + 1):
+            try:
+                client = genai.Client(api_key=resolved_api_key)
+                response = client.models.generate_content(
+                    model=resolved_model,
+                    contents=prompt,
+                )
+
+                if hasattr(response, "text") and response.text:
+                    return clean_fountain_text(response.text)
+
+                raise InferenceError("API returned an empty response payload.")
+
+            except InferenceError:
+                raise
+            except Exception as err:
+                last_exception = err
+                err_str = str(err).lower()
+                is_transient = any(
+                    code in err_str
+                    for code in [
+                        "500",
+                        "502",
+                        "503",
+                        "504",
+                        "overloaded",
+                        "unavailable",
+                        "resourceexhausted",
+                        "internal server error",
+                        "transient",
+                        "rate limit",
+                    ]
+                )
+                if is_transient and attempt < cls.MAX_RETRIES:
+                    backoff = 2 ** (attempt - 1)
+                    time.sleep(backoff)
+                    continue
+                else:
+                    raise InferenceError(f"Gemini API screenplay generation failed: {err}") from err
+
+        raise InferenceError(f"Gemini API screenplay generation failed after {cls.MAX_RETRIES} attempts: {last_exception}")
+
+    @classmethod
     def generate_treatment(
         cls,
         prompt: str,

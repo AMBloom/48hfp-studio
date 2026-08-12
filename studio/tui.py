@@ -14,12 +14,15 @@ from studio.models.profile import TeamProfile
 from studio.models.treatment import TreatmentOutput
 from studio.screens import ApiSettingsScreen, DrawWizardScreen, ProfileSetupScreen
 from studio.screens_library import ConstraintLibraryScreen
+from studio.screens_load import LoadDraftsScreen
 from studio.screens_quiz import OnboardingQuizScreen
+from studio.screens_screenplay import ScreenplayWorkspace
 from studio.screens_workspace import WorkspaceManagerScreen
 from studio.utils.draw_store import load_draw
 from studio.utils.global_state import get_active_workspace
 from studio.utils.profile_store import load_profile
 from studio.utils.prompt_builder import PromptBuilder
+from studio.utils.screenplay_store import save_screenplay_output
 from studio.utils.treatment_store import (
     convert_treatment_to_markdown,
     save_treatment_output,
@@ -89,11 +92,11 @@ class NavigationSidebar(Static):
     def compose(self) -> ComposeResult:
         yield Button("👤 Profile Setup [P]", id="btn_profile_modal", variant="default")
         yield Button("📂 Workspace Manager [W]", id="btn_workspace_modal", variant="default")
+        yield Button("📂 Load Drafts [O]", id="btn_load_drafts", variant="default")
         yield Button("🔮 Filmmaker Quiz [Z]", id="btn_quiz_modal", variant="default")
         yield Button("📚 Constraints [L]", id="btn_library_modal", variant="default")
         yield Button("🎲 Friday Draw [D]", id="btn_draw_modal", variant="primary")
         yield Button("⚙️ Settings [S]", id="btn_settings_modal", variant="default")
-
 
 
 class StudioApp(App):
@@ -108,6 +111,10 @@ class StudioApp(App):
     current_treatment_obj: reactive[Optional[TreatmentOutput]] = reactive(None)
     current_prompt_text: reactive[Optional[str]] = reactive(None)
     is_revising: reactive[bool] = reactive(False)
+
+    active_view: reactive[str] = reactive("treatment")
+    current_screenplay_text: reactive[str] = reactive("")
+    is_generating_screenplay: reactive[bool] = reactive(False)
 
     CSS = """
     Screen {
@@ -125,6 +132,7 @@ class StudioApp(App):
     BINDINGS = [
         ("p", "open_profile_setup", "Profile Setup"),
         ("w", "open_workspace_manager", "Workspace Manager"),
+        ("o", "open_load_drafts", "Load Drafts"),
         ("z", "open_quiz", "Filmmaker Quiz"),
         ("l", "open_library", "Constraint Library"),
         ("d", "open_draw_wizard", "Friday Draw"),
@@ -134,19 +142,52 @@ class StudioApp(App):
         ("ctrl+c", "quit", "Quit"),
     ]
 
-
     def compose(self) -> ComposeResult:
         """Compose the 3-zone layout: Header HUD, Left Sidebar, Main Workspace."""
         yield HeaderHUD(id="header-hud")
         with Horizontal(id="workspace-container"):
             yield NavigationSidebar(id="nav-sidebar")
             yield StudioWorkspace(id="main-workspace")
+            yield ScreenplayWorkspace(id="screenplay-workspace")
         yield Footer()
 
     def on_mount(self) -> None:
         """Initialize reactive application state from persistent stores on mount."""
         self.app_profile = load_profile()
         self.app_draw = load_draw()
+        self.watch_active_view(self.active_view)
+
+    def watch_active_view(self, active_view: str) -> None:
+        """Toggle workspace view between Treatment workspace and Screenplay workspace."""
+        try:
+            ws = self.query_one("#main-workspace", StudioWorkspace)
+            sp = self.query_one("#screenplay-workspace", ScreenplayWorkspace)
+            if active_view == "screenplay":
+                ws.display = False
+                sp.display = True
+            else:
+                ws.display = True
+                sp.display = False
+        except Exception:
+            pass
+
+    def watch_current_screenplay_text(self, text: str) -> None:
+        """Push current_screenplay_text down to ScreenplayWorkspace."""
+        try:
+            sp = self.query_one("#screenplay-workspace", ScreenplayWorkspace)
+            sp.fountain_text = text
+        except Exception:
+            pass
+
+    def watch_is_generating_screenplay(self, is_gen: bool) -> None:
+        """Push is_generating_screenplay state down to workspaces."""
+        try:
+            ws = self.query_one("#main-workspace", StudioWorkspace)
+            sp = self.query_one("#screenplay-workspace", ScreenplayWorkspace)
+            ws.is_generating_screenplay = is_gen
+            sp.is_generating = is_gen
+        except Exception:
+            pass
 
     def watch_app_profile(self, profile: Optional[TeamProfile]) -> None:
         """Push app_profile state changes down to child widgets."""
@@ -193,6 +234,14 @@ class StudioApp(App):
         except Exception:
             pass
 
+    def action_switch_to_treatment_view(self) -> None:
+        """Switch active workspace view back to Treatment view."""
+        self.active_view = "treatment"
+
+    def action_switch_to_screenplay_view(self) -> None:
+        """Switch active workspace view to Screenplay view."""
+        self.active_view = "screenplay"
+
     def action_open_draw_wizard(self) -> None:
         """Push the DrawWizardScreen modal."""
         self.push_screen(DrawWizardScreen(self.app_draw), callback=self.update_draw)
@@ -200,6 +249,27 @@ class StudioApp(App):
     def action_open_workspace_manager(self) -> None:
         """Push the WorkspaceManagerScreen modal."""
         self.push_screen(WorkspaceManagerScreen(), callback=self.update_workspace)
+
+    def action_open_load_drafts(self) -> None:
+        """Push the LoadDraftsScreen modal."""
+        self.push_screen(LoadDraftsScreen(), callback=self.on_load_draft_selected)
+
+    def on_load_draft_selected(self, result: Optional[dict]) -> None:
+        """Callback invoked when LoadDraftsScreen is dismissed."""
+        if not result:
+            return
+        d_type = result.get("type")
+        content = result.get("content", "")
+        file_path = result.get("path", "")
+
+        if d_type == "treatment":
+            self.current_markdown = content
+            self.active_view = "treatment"
+            self.notify(f"Loaded treatment draft from {file_path}", title="Treatment Loaded", severity="information")
+        elif d_type == "screenplay":
+            self.current_screenplay_text = content
+            self.active_view = "screenplay"
+            self.notify(f"Loaded screenplay draft from {file_path}", title="Screenplay Loaded", severity="information")
 
     def action_open_profile_setup(self) -> None:
         """Push the ProfileSetupScreen modal."""
@@ -216,7 +286,6 @@ class StudioApp(App):
     def action_open_api_settings(self) -> None:
         """Push the ApiSettingsScreen modal."""
         self.push_screen(ApiSettingsScreen())
-
 
     @work(thread=True)
     def action_generate_treatment(self) -> None:
@@ -310,11 +379,60 @@ class StudioApp(App):
             err_msg = str(err)
             self.call_from_thread(self._on_revision_error, err_msg)
 
+    @work(thread=True)
+    def action_generate_screenplay(self) -> None:
+        """Compile screenplay prompt and generate Fountain script in background worker thread."""
+        if not self.current_treatment_obj:
+            self.notify(
+                "Please generate or load a film treatment before generating a screenplay.",
+                title="Treatment Required",
+                severity="warning",
+            )
+            return
+
+        self.call_from_thread(self._set_screenplay_generating_state, True)
+        self.call_from_thread(self.action_switch_to_screenplay_view)
+
+        extra_directives = None
+        try:
+            from textual.widgets import TextArea
+            from studio.workspace import RecipePane
+            recipe_pane = self.query_one(RecipePane)
+            ta = recipe_pane.query_one("#additional_instructions", TextArea)
+            extra_directives = ta.text
+        except Exception:
+            pass
+
+        try:
+            prompt = PromptBuilder.compile_screenplay_prompt(
+                treatment=self.current_treatment_obj,
+                draw=self.app_draw,
+                profile=self.app_profile,
+                additional_instructions=extra_directives,
+            )
+            raw_screenplay = InferenceEngine.generate_screenplay(prompt=prompt)
+            title = self.current_treatment_obj.title_and_logline.title
+            saved_path = save_screenplay_output(raw_screenplay, title=title)
+            self.call_from_thread(
+                self._on_screenplay_success,
+                raw_screenplay,
+                str(saved_path),
+            )
+        except InferenceError as err:
+            err_msg = str(err)
+            self.call_from_thread(self._on_screenplay_error, err_msg)
+        except Exception as err:
+            err_msg = str(err)
+            self.call_from_thread(self._on_screenplay_error, err_msg)
+
     def _set_generating_state(self, state: bool) -> None:
         self.is_generating = state
 
     def _set_revising_state(self, state: bool) -> None:
         self.is_revising = state
+
+    def _set_screenplay_generating_state(self, state: bool) -> None:
+        self.is_generating_screenplay = state
 
     def _on_treatment_success(
         self,
@@ -376,6 +494,23 @@ class StudioApp(App):
             severity="error",
         )
 
+    def _on_screenplay_success(self, screenplay_text: str, saved_path: str) -> None:
+        self.current_screenplay_text = screenplay_text
+        self.is_generating_screenplay = False
+        self.notify(
+            f"Screenplay saved to {saved_path}",
+            title="Screenplay Generated",
+            severity="information",
+        )
+
+    def _on_screenplay_error(self, err_msg: str) -> None:
+        self.is_generating_screenplay = False
+        self.notify(
+            f"Screenplay generation failed: {err_msg}",
+            title="Screenplay Error",
+            severity="error",
+        )
+
     def update_draw(self, new_draw: Optional[FridayDraw]) -> None:
         """Callback invoked when DrawWizardScreen is dismissed."""
         if new_draw is not None:
@@ -402,6 +537,8 @@ class StudioApp(App):
             self.action_open_profile_setup()
         elif event.button.id == "btn_workspace_modal":
             self.action_open_workspace_manager()
+        elif event.button.id == "btn_load_drafts":
+            self.action_open_load_drafts()
         elif event.button.id == "btn_quiz_modal":
             self.action_open_quiz()
         elif event.button.id == "btn_library_modal":
@@ -414,13 +551,8 @@ class StudioApp(App):
             self.action_generate_treatment()
         elif event.button.id == "btn_submit_revision":
             self.action_revise_treatment()
-
-
-if __name__ == "__main__":
-    app = StudioApp()
-    app.run()
-
-
+        elif event.button.id == "btn_generate_screenplay":
+            self.action_generate_screenplay()
 
 
 if __name__ == "__main__":

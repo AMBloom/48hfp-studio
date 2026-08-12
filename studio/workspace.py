@@ -156,9 +156,10 @@ class RecipePane(Static):
 
 
 class RevisionPane(Static):
-    """Bottom container docked in OutputPane for submitting treatment revision requests."""
+    """Bottom container docked in OutputPane for submitting treatment revision requests or generating screenplays."""
 
     is_revising: reactive[bool] = reactive(False)
+    is_generating_screenplay: reactive[bool] = reactive(False)
 
     DEFAULT_CSS = """
     RevisionPane {
@@ -182,8 +183,19 @@ class RevisionPane(Static):
         margin-bottom: 1;
     }
 
-    #btn_submit_revision {
+    #revision-button-bar {
         width: 100%;
+        height: auto;
+        margin-top: 1;
+    }
+
+    #revision-button-bar Button {
+        width: 1fr;
+        margin-right: 1;
+    }
+
+    #btn_generate_screenplay {
+        margin-right: 0;
     }
 
     #revision_loading {
@@ -193,16 +205,22 @@ class RevisionPane(Static):
     """
 
     def compose(self) -> ComposeResult:
-        yield Label("✏️ [bold yellow]REVISE TREATMENT[/bold yellow]", id="revision_notes_label")
+        yield Label("✏️ [bold yellow]REVISE TREATMENT OR GENERATE SCRIPT[/bold yellow]", id="revision_notes_label")
         yield TextArea(
             placeholder="Give notes (e.g., 'Make the ending darker', 'Add a scene at the harbor')...",
             id="revision_notes_input",
         )
-        yield Button(
-            "🔄 Submit Revision",
-            id="btn_submit_revision",
-            variant="primary",
-        )
+        with Horizontal(id="revision-button-bar"):
+            yield Button(
+                "🔄 Submit Revision",
+                id="btn_submit_revision",
+                variant="primary",
+            )
+            yield Button(
+                "🎬 Generate Screenplay [S]",
+                id="btn_generate_screenplay",
+                variant="success",
+            )
         yield LoadingIndicator(id="revision_loading")
 
     def on_mount(self) -> None:
@@ -211,21 +229,25 @@ class RevisionPane(Static):
     def watch_is_revising(self, is_rev: bool) -> None:
         self.apply_revising_state()
 
+    def watch_is_generating_screenplay(self, is_gen: bool) -> None:
+        self.apply_revising_state()
+
     def apply_revising_state(self) -> None:
         try:
             loader = self.query_one("#revision_loading", LoadingIndicator)
             notes_input = self.query_one("#revision_notes_input", TextArea)
-            btn = self.query_one("#btn_submit_revision", Button)
+            btn_bar = self.query_one("#revision-button-bar", Horizontal)
             lbl = self.query_one("#revision_notes_label", Label)
-            if self.is_revising:
+            is_active = self.is_revising or self.is_generating_screenplay
+            if is_active:
                 loader.display = True
                 notes_input.display = False
-                btn.display = False
+                btn_bar.display = False
                 lbl.display = False
             else:
                 loader.display = False
                 notes_input.display = True
-                btn.display = True
+                btn_bar.display = True
                 lbl.display = True
         except Exception:
             pass
@@ -290,6 +312,13 @@ class OutputPane(Static):
         except Exception:
             pass
 
+    def watch_is_generating_screenplay(self, is_gen: bool) -> None:
+        try:
+            rev_pane = self.query_one(RevisionPane)
+            rev_pane.is_generating_screenplay = is_gen
+        except Exception:
+            pass
+
     def apply_has_treatment_state(self) -> None:
         try:
             rev_pane = self.query_one(RevisionPane)
@@ -320,6 +349,7 @@ class StudioWorkspace(Static):
     is_generating: reactive[bool] = reactive(False)
     has_treatment: reactive[bool] = reactive(False)
     is_revising: reactive[bool] = reactive(False)
+    is_generating_screenplay: reactive[bool] = reactive(False)
 
     DEFAULT_CSS = """
     StudioWorkspace {
@@ -373,6 +403,12 @@ class StudioWorkspace(Static):
     def watch_is_revising(self, is_rev: bool) -> None:
         try:
             self.query_one(OutputPane).is_revising = is_rev
+        except Exception:
+            pass
+
+    def watch_is_generating_screenplay(self, is_gen: bool) -> None:
+        try:
+            self.query_one(OutputPane).is_generating_screenplay = is_gen
         except Exception:
             pass
 
