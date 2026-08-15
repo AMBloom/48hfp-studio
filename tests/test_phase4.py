@@ -175,7 +175,7 @@ def test_inference_engine_model_resolution():
         with patch("google.genai.Client", return_value=mock_client):
             # 1. Default model resolution
             InferenceEngine.generate_treatment("Test Prompt")
-            assert mock_client.models.generate_content.call_args.kwargs["model"] == "gemini-3.6-flash"
+            assert mock_client.models.generate_content.call_args.kwargs["model"] == "gemini-3.7-flash"
 
     # 2. Environment variable fallback
     with patch.dict(

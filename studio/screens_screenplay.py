@@ -73,6 +73,7 @@ class ScreenplayWorkspace(Static):
     fountain_text: reactive[str] = reactive("")
     current_page: reactive[int] = reactive(1)
     is_generating: reactive[bool] = reactive(False)
+    is_generating_shotlist: reactive[bool] = reactive(False)
 
     LINES_PER_PAGE = 50
 
@@ -141,6 +142,7 @@ class ScreenplayWorkspace(Static):
             yield Button("◀ Page Up", id="btn_page_up", variant="primary")
             yield Label("Page 1 of 1", id="page_indicator")
             yield Button("Page Down ▶", id="btn_page_down", variant="primary")
+            yield Button("🎥 Generate Shot List [T]", id="btn_generate_shotlist", variant="success")
 
         with VerticalScroll(id="page-scroll"):
             yield LoadingIndicator(id="screenplay-loading")
@@ -160,6 +162,18 @@ class ScreenplayWorkspace(Static):
 
     def watch_is_generating(self, is_gen: bool) -> None:
         self.apply_generating_state()
+
+    def watch_is_generating_shotlist(self, is_gen: bool) -> None:
+        try:
+            btn = self.query_one("#btn_generate_shotlist", Button)
+            if is_gen:
+                btn.label = "⏳ Generating..."
+                btn.disabled = True
+            else:
+                btn.label = "🎥 Generate Shot List [T]"
+                btn.disabled = False
+        except Exception:
+            pass
 
     def apply_generating_state(self) -> None:
         try:
@@ -216,3 +230,7 @@ class ScreenplayWorkspace(Static):
         elif event.button.id == "btn_back_to_treatment":
             if hasattr(self.app, "action_switch_to_treatment_view"):
                 self.app.action_switch_to_treatment_view()
+        elif event.button.id == "btn_generate_shotlist":
+            if hasattr(self.app, "action_generate_shotlist"):
+                self.app.action_generate_shotlist()
+

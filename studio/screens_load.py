@@ -1,17 +1,18 @@
 """Modal Screen for browsing and loading saved Treatments and Screenplays."""
 
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Label, TabbedContent, TabPane
 
+from studio.utils.asset_store import list_saved_shotlists, load_shotlist_csv
 from studio.utils.screenplay_store import list_saved_screenplays, list_saved_treatments
 
 
-class LoadDraftsScreen(ModalScreen[Optional[Dict[str, str]]]):
-    """Modal screen displaying saved treatments and screenplays for selection and loading."""
+class LoadDraftsScreen(ModalScreen[Optional[Dict[str, Any]]]):
+    """Modal screen displaying saved treatments, screenplays, and shot lists for selection and loading."""
 
     DEFAULT_CSS = """
     LoadDraftsScreen {
@@ -68,6 +69,8 @@ class LoadDraftsScreen(ModalScreen[Optional[Dict[str, str]]]):
                     yield DataTable(id="table-treatments")
                 with TabPane("🎬 Screenplays", id="tab-screenplays"):
                     yield DataTable(id="table-screenplays")
+                with TabPane("📊 Shot Lists", id="tab-shotlists"):
+                    yield DataTable(id="table-shotlists")
 
             with Horizontal(id="button-bar"):
                 yield Button("Load Draft", variant="primary", id="btn_load_draft")
@@ -102,6 +105,20 @@ class LoadDraftsScreen(ModalScreen[Optional[Dict[str, str]]]):
                 key=s["path"],
             )
 
+        table_sl = self.query_one("#table-shotlists", DataTable)
+        table_sl.cursor_type = "row"
+        table_sl.add_columns("Ver", "Title", "Date Modified", "Filename")
+
+        shotlists = list_saved_shotlists()
+        for sl in shotlists:
+            table_sl.add_row(
+                sl["version"],
+                sl["title"],
+                sl["formatted_date"],
+                sl["filename"],
+                key=sl["path"],
+            )
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn_load_draft":
             self.action_submit_load()
@@ -118,9 +135,12 @@ class LoadDraftsScreen(ModalScreen[Optional[Dict[str, str]]]):
         if active_tab == "tab-treatments":
             table = self.query_one("#table-treatments", DataTable)
             draft_type = "treatment"
-        else:
+        elif active_tab == "tab-screenplays":
             table = self.query_one("#table-screenplays", DataTable)
             draft_type = "screenplay"
+        else:
+            table = self.query_one("#table-shotlists", DataTable)
+            draft_type = "shotlist"
 
         if table.cursor_row < 0 or table.row_count == 0:
             self.notify("Please select a draft row to load.", severity="warning")
@@ -134,7 +154,11 @@ class LoadDraftsScreen(ModalScreen[Optional[Dict[str, str]]]):
                 self.notify(f"File not found: {file_path}", severity="error")
                 return
 
-            content = file_path.read_text(encoding="utf-8")
+            if draft_type == "shotlist":
+                content = load_shotlist_csv(file_path)
+            else:
+                content = file_path.read_text(encoding="utf-8")
+
             self.dismiss({
                 "type": draft_type,
                 "path": str(file_path),
@@ -143,6 +167,7 @@ class LoadDraftsScreen(ModalScreen[Optional[Dict[str, str]]]):
             })
         except Exception as err:
             self.notify(f"Failed to load draft: {err}", severity="error")
+
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Double clicking or pressing Enter on a row directly loads the draft."""

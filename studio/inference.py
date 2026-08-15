@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
+from studio.models.shotlist import ShotListBase
 from studio.models.treatment import TreatmentOutput
 
 load_dotenv()
@@ -25,7 +26,7 @@ class InferenceError(Exception):
 class InferenceEngine:
     """Interface for invoking Gemini models with structured outputs."""
 
-    DEFAULT_MODEL = "gemini-3.6-flash"
+    DEFAULT_MODEL = "gemini-3.7-flash"
     MAX_RETRIES = 3
 
     @classmethod
@@ -209,4 +210,166 @@ class InferenceEngine:
                     raise InferenceError(f"Gemini API inference failed: {err}") from err
 
         raise InferenceError(f"Gemini API inference failed after {cls.MAX_RETRIES} attempts: {last_exception}")
+
+    @classmethod
+    def generate_shotlist(
+        cls,
+        prompt: str,
+        model_name: Optional[str] = None,
+        api_key: Optional[str] = None,
+    ) -> ShotListBase:
+        """Generate a structured StudioBinder shot list using Gemini API.
+
+        Args:
+            prompt: The compiled shot list prompt string.
+            model_name: Optional model override.
+            api_key: Optional API key override.
+
+        Returns:
+            ShotListBase: Structured Pydantic model instance.
+
+        Raises:
+            InferenceError: If API key is missing, network fails, or output schema fails validation.
+        """
+        resolved_api_key = api_key or os.environ.get("GEMINI_API_KEY")
+        if not resolved_api_key:
+            raise InferenceError(
+                "Missing GEMINI_API_KEY environment variable.\n"
+                "Please set GEMINI_API_KEY in your environment or .env file before running shot list generation."
+            )
+
+        resolved_model = (
+            model_name or os.environ.get("GEMINI_MODEL") or cls.DEFAULT_MODEL
+        )
+
+        last_exception = None
+        for attempt in range(1, cls.MAX_RETRIES + 1):
+            try:
+                client = genai.Client(api_key=resolved_api_key)
+                response = client.models.generate_content(
+                    model=resolved_model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=ShotListBase,
+                    ),
+                )
+
+                if hasattr(response, "parsed") and isinstance(response.parsed, ShotListBase):
+                    return response.parsed
+
+                if hasattr(response, "text") and response.text:
+                    return ShotListBase.model_validate_json(response.text)
+
+                raise InferenceError("API returned an empty or invalid response payload.")
+
+            except InferenceError:
+                raise
+            except Exception as err:
+                last_exception = err
+                err_str = str(err).lower()
+                is_transient = any(
+                    code in err_str
+                    for code in [
+                        "500",
+                        "502",
+                        "503",
+                        "504",
+                        "overloaded",
+                        "unavailable",
+                        "resourceexhausted",
+                        "internal server error",
+                        "transient",
+                        "rate limit",
+                    ]
+                )
+                if is_transient and attempt < cls.MAX_RETRIES:
+                    backoff = 2 ** (attempt - 1)
+                    time.sleep(backoff)
+                    continue
+                else:
+                    raise InferenceError(f"Gemini API shot list generation failed: {err}") from err
+
+        raise InferenceError(f"Gemini API shot list generation failed after {cls.MAX_RETRIES} attempts: {last_exception}")
+
+    @classmethod
+    def generate_storyboard_image(
+        cls,
+        prompt: str,
+        api_key: Optional[str] = None,
+    ) -> bytes:
+        """Generate a 16:9 monochrome pre-vis storyboard PNG image using Gemini Image API.
+
+        Args:
+            prompt: The compiled storyboard image prompt string.
+            api_key: Optional API key override.
+
+        Returns:
+            bytes: Raw image file payload bytes.
+
+        Raises:
+            InferenceError: If API key is missing, network fails, or output payload contains no image bytes.
+        """
+        resolved_api_key = api_key or os.environ.get("GEMINI_API_KEY")
+        if not resolved_api_key:
+            raise InferenceError(
+                "Missing GEMINI_API_KEY environment variable.\n"
+                "Please set GEMINI_API_KEY in your environment or .env file before running storyboard generation."
+            )
+
+        model_name = "gemini-3.1-flash-lite-image"
+
+        last_exception = None
+        for attempt in range(1, cls.MAX_RETRIES + 1):
+            try:
+                client = genai.Client(api_key=resolved_api_key)
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_modalities=["IMAGE"],
+                        image_config=types.ImageConfig(aspect_ratio="16:9"),
+                    ),
+                )
+
+                if hasattr(response, "candidates") and response.candidates:
+                    first_cand = response.candidates[0]
+                    if hasattr(first_cand, "content") and first_cand.content:
+                        parts = getattr(first_cand.content, "parts", []) or []
+                        for part in parts:
+                            if hasattr(part, "inline_data") and part.inline_data:
+                                if hasattr(part.inline_data, "data") and part.inline_data.data:
+                                    return part.inline_data.data
+
+                raise InferenceError("API returned no image bytes in response payload.")
+
+            except InferenceError:
+                raise
+            except Exception as err:
+                last_exception = err
+                err_str = str(err).lower()
+                is_transient = any(
+                    code in err_str
+                    for code in [
+                        "500",
+                        "502",
+                        "503",
+                        "504",
+                        "overloaded",
+                        "unavailable",
+                        "resourceexhausted",
+                        "internal server error",
+                        "transient",
+                        "rate limit",
+                    ]
+                )
+                if is_transient and attempt < cls.MAX_RETRIES:
+                    backoff = 2 ** (attempt - 1)
+                    time.sleep(backoff)
+                    continue
+                else:
+                    raise InferenceError(f"Gemini API storyboard generation failed: {err}") from err
+
+        raise InferenceError(f"Gemini API storyboard generation failed after {cls.MAX_RETRIES} attempts: {last_exception}")
+
 

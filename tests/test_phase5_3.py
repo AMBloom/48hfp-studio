@@ -14,12 +14,12 @@ runner = CliRunner()
 
 
 def test_version_bump():
-    """Verify application version is updated to 0.1.1."""
-    assert __version__ == "0.1.1"
+    """Verify application version is updated to 3.0.0."""
+    assert __version__ == "3.0.0"
 
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert "0.1.1" in result.output
+    assert "3.0.0" in result.output
 
 
 def test_required_line_quote_stripping():

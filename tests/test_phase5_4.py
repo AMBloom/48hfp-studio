@@ -18,7 +18,7 @@ def anyio_backend():
 def test_studio_app_initialization():
     """Verify StudioApp instantiates with correct title and attributes."""
     app_instance = StudioApp()
-    assert app_instance.TITLE == "48HFP-Studio v2.0"
+    assert app_instance.TITLE == "48HFP-Studio v3.0"
 
 
 @pytest.mark.anyio
@@ -33,7 +33,7 @@ async def test_studio_app_run_test():
         assert header is not None
         assert sidebar is not None
         assert workspace is not None
-        assert "🎬 48HFP-Studio v2.0" in header.render()
+        assert "🎬 48HFP-Studio v3.0" in header.render()
 
 
 def test_cli_root_launches_studio_app():

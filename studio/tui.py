@@ -1,7 +1,7 @@
 """Stateful Terminal User Interface (TUI) for 48HFP-Studio using Textual."""
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, List, Optional
 from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
@@ -11,13 +11,16 @@ from textual.widgets import Button, Footer, Header, Label, Static
 from studio.inference import InferenceEngine, InferenceError
 from studio.models.draw import FridayDraw
 from studio.models.profile import TeamProfile
+from studio.models.shotlist import ShotItem, ShotListBase
 from studio.models.treatment import TreatmentOutput
 from studio.screens import ApiSettingsScreen, DrawWizardScreen, ProfileSetupScreen
 from studio.screens_library import ConstraintLibraryScreen
 from studio.screens_load import LoadDraftsScreen
 from studio.screens_quiz import OnboardingQuizScreen
 from studio.screens_screenplay import ScreenplayWorkspace
+from studio.screens_shotlist import ShotListWorkspace
 from studio.screens_workspace import WorkspaceManagerScreen
+from studio.utils.asset_store import save_shotlist_csv, save_storyboard_image
 from studio.utils.draw_store import load_draw
 from studio.utils.global_state import get_active_workspace
 from studio.utils.profile_store import load_profile
@@ -61,13 +64,13 @@ class HeaderHUD(Static):
         ws = get_active_workspace()
         ws_str = f" | Workspace: {ws.name}" if ws else ""
         team_str = f" | Team: {self.profile.team_name}" if self.profile else ""
-        self.update(f"🎬 48HFP-Studio v2.0{ws_str}{team_str}")
+        self.update(f"🎬 48HFP-Studio v3.0{ws_str}{team_str}")
 
     def render(self) -> str:
         ws = get_active_workspace()
         ws_str = f" | Workspace: {ws.name}" if ws else ""
         team_str = f" | Team: {self.profile.team_name}" if self.profile else ""
-        return f"🎬 48HFP-Studio v2.0{ws_str}{team_str}"
+        return f"🎬 48HFP-Studio v3.0{ws_str}{team_str}"
 
 
 class NavigationSidebar(Static):
@@ -102,7 +105,7 @@ class NavigationSidebar(Static):
 class StudioApp(App):
     """Main Textual TUI Application for 48HFP-Studio."""
 
-    TITLE = "48HFP-Studio v2.0"
+    TITLE = "48HFP-Studio v3.0"
 
     app_profile: reactive[Optional[TeamProfile]] = reactive(None)
     app_draw: reactive[Optional[FridayDraw]] = reactive(None)
@@ -115,6 +118,17 @@ class StudioApp(App):
     active_view: reactive[str] = reactive("treatment")
     current_screenplay_text: reactive[str] = reactive("")
     is_generating_screenplay: reactive[bool] = reactive(False)
+    current_shotlist_data: reactive[Any] = reactive(None)
+    is_generating_shotlist: reactive[bool] = reactive(False)
+    is_generating_storyboards: reactive[bool] = reactive(False)
+
+    def watch_is_generating_storyboards(self, is_gen: bool) -> None:
+        """Push is_generating_storyboards state down to ShotListWorkspace."""
+        try:
+            sl = self.query_one("#shotlist-workspace", ShotListWorkspace)
+            sl.is_generating_storyboards = is_gen
+        except Exception:
+            pass
 
     CSS = """
     Screen {
@@ -143,12 +157,13 @@ class StudioApp(App):
     ]
 
     def compose(self) -> ComposeResult:
-        """Compose the 3-zone layout: Header HUD, Left Sidebar, Main Workspace."""
+        """Compose the 3-zone layout: Header HUD, Left Sidebar, Main Workspaces."""
         yield HeaderHUD(id="header-hud")
         with Horizontal(id="workspace-container"):
             yield NavigationSidebar(id="nav-sidebar")
             yield StudioWorkspace(id="main-workspace")
             yield ScreenplayWorkspace(id="screenplay-workspace")
+            yield ShotListWorkspace(id="shotlist-workspace")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -158,16 +173,23 @@ class StudioApp(App):
         self.watch_active_view(self.active_view)
 
     def watch_active_view(self, active_view: str) -> None:
-        """Toggle workspace view between Treatment workspace and Screenplay workspace."""
+        """Toggle active workspace view among Treatment, Screenplay, and ShotList."""
         try:
             ws = self.query_one("#main-workspace", StudioWorkspace)
             sp = self.query_one("#screenplay-workspace", ScreenplayWorkspace)
-            if active_view == "screenplay":
+            sl = self.query_one("#shotlist-workspace", ShotListWorkspace)
+            if active_view == "shotlist":
+                ws.display = False
+                sp.display = False
+                sl.display = True
+            elif active_view == "screenplay":
                 ws.display = False
                 sp.display = True
+                sl.display = False
             else:
                 ws.display = True
                 sp.display = False
+                sl.display = False
         except Exception:
             pass
 
@@ -188,6 +210,23 @@ class StudioApp(App):
             sp.is_generating = is_gen
         except Exception:
             pass
+
+    def watch_current_shotlist_data(self, data: Any) -> None:
+        """Push current_shotlist_data down to ShotListWorkspace."""
+        try:
+            sl = self.query_one("#shotlist-workspace", ShotListWorkspace)
+            sl.shotlist_data = data
+        except Exception:
+            pass
+
+    def watch_is_generating_shotlist(self, is_gen: bool) -> None:
+        """Push is_generating_shotlist state down to ScreenplayWorkspace."""
+        try:
+            sp = self.query_one("#screenplay-workspace", ScreenplayWorkspace)
+            sp.is_generating_shotlist = is_gen
+        except Exception:
+            pass
+
 
     def watch_app_profile(self, profile: Optional[TeamProfile]) -> None:
         """Push app_profile state changes down to child widgets."""
@@ -270,6 +309,23 @@ class StudioApp(App):
             self.current_screenplay_text = content
             self.active_view = "screenplay"
             self.notify(f"Loaded screenplay draft from {file_path}", title="Screenplay Loaded", severity="information")
+        elif d_type == "shotlist":
+            self.current_shotlist_data = content
+            self.active_view = "shotlist"
+            self.notify(f"Loaded shot list draft from {file_path}", title="Shot List Loaded", severity="information")
+
+    def action_switch_to_treatment_view(self) -> None:
+        """Switch active view to Treatment workspace."""
+        self.active_view = "treatment"
+
+    def action_switch_to_screenplay_view(self) -> None:
+        """Switch active view to Screenplay workspace."""
+        self.active_view = "screenplay"
+
+    def action_switch_to_shotlist_view(self) -> None:
+        """Switch active view to ShotList workspace."""
+        self.active_view = "shotlist"
+
 
     def action_open_profile_setup(self) -> None:
         """Push the ProfileSetupScreen modal."""
@@ -511,6 +567,155 @@ class StudioApp(App):
             severity="error",
         )
 
+    @work(thread=True)
+    def action_generate_shotlist(self) -> None:
+        """Compile shotlist prompt and generate StudioBinder shot list in background worker thread."""
+        if not self.current_screenplay_text or not self.current_screenplay_text.strip():
+            self.notify(
+                "Please generate or load a screenplay before generating a shot list.",
+                title="Screenplay Required",
+                severity="warning",
+            )
+            return
+
+        self.call_from_thread(self._set_shotlist_generating_state, True)
+
+        try:
+            prompt = PromptBuilder.compile_shotlist_prompt(
+                screenplay_text=self.current_screenplay_text,
+                profile=self.app_profile,
+                draw=self.app_draw,
+            )
+            shotlist_obj = InferenceEngine.generate_shotlist(prompt=prompt)
+            title = "Untitled"
+            if self.current_treatment_obj and self.current_treatment_obj.title_and_logline:
+                title = self.current_treatment_obj.title_and_logline.title
+            saved_path = save_shotlist_csv(shotlist_obj, title=title)
+            self.call_from_thread(
+                self._on_shotlist_success,
+                shotlist_obj,
+                str(saved_path),
+            )
+        except InferenceError as err:
+            err_msg = str(err)
+            self.call_from_thread(self._on_shotlist_error, err_msg)
+        except Exception as err:
+            err_msg = str(err)
+            self.call_from_thread(self._on_shotlist_error, err_msg)
+
+    def _set_shotlist_generating_state(self, state: bool) -> None:
+        self.is_generating_shotlist = state
+
+    def _on_shotlist_success(self, shotlist_obj: Any, saved_path: str) -> None:
+        self.current_shotlist_data = shotlist_obj
+        self.is_generating_shotlist = False
+        self.active_view = "shotlist"
+        self.notify(
+            f"Shot list saved to {saved_path}",
+            title="Shot List Generated",
+            severity="information",
+        )
+
+    def _on_shotlist_error(self, err_msg: str) -> None:
+        self.is_generating_shotlist = False
+        self.notify(
+            f"Shot list generation failed: {err_msg}",
+            title="Shot List Error",
+            severity="error",
+        )
+
+    @work(thread=True)
+    def action_generate_storyboards(self) -> None:
+        """Generate 16:9 monochrome pre-vis storyboards for active shot list in background worker thread."""
+        if not self.current_shotlist_data:
+            self.notify(
+                "Please generate or load a shot list before generating storyboards.",
+                title="Shot List Required",
+                severity="warning",
+            )
+            return
+
+        shots: List[ShotItem] = []
+        if isinstance(self.current_shotlist_data, ShotListBase):
+            shots = self.current_shotlist_data.shots
+        elif isinstance(self.current_shotlist_data, list):
+            for row in self.current_shotlist_data:
+                if isinstance(row, ShotItem):
+                    shots.append(row)
+                elif isinstance(row, dict):
+                    cast_raw = row.get("Cast", row.get("cast", []))
+                    cast_list = cast_raw if isinstance(cast_raw, list) else [c.strip() for c in str(cast_raw or "").split(",") if c.strip()]
+                    try:
+                        shot_num = int(row.get("Shot", row.get("shot_number", 1)))
+                    except Exception:
+                        shot_num = 1
+                    shots.append(ShotItem(
+                        shot_number=shot_num,
+                        scene_number=str(row.get("Scene", row.get("scene_number", "1"))),
+                        location=str(row.get("Location", row.get("location", ""))),
+                        setup=str(row.get("Setup", row.get("setup", ""))),
+                        shot_size=str(row.get("Shot Size", row.get("shot_size", "MS"))),
+                        camera_movement=str(row.get("Camera Movement", row.get("camera_movement", "Static"))),
+                        cast=cast_list,
+                        description=str(row.get("Description", row.get("description", ""))),
+                    ))
+
+        if not shots:
+            self.notify(
+                "No valid shots found in the active shot list.",
+                title="Empty Shot List",
+                severity="warning",
+            )
+            return
+
+        self.call_from_thread(self._set_storyboard_generating_state, True)
+
+        saved_paths: List[str] = []
+        try:
+            directorial_vision = None
+            if self.app_profile and self.app_profile.active_directorial_vision:
+                from studio.utils.constraint_store import load_directorial_vision
+                directorial_vision = load_directorial_vision(self.app_profile.active_directorial_vision)
+
+            for shot in shots:
+                prompt = PromptBuilder.compile_storyboard_prompt(shot, directorial_vision)
+                image_bytes = InferenceEngine.generate_storyboard_image(prompt)
+                saved_path = save_storyboard_image(
+                    image_bytes=image_bytes,
+                    shot_number=shot.shot_number,
+                    scene_number=str(shot.scene_number),
+                )
+                saved_paths.append(str(saved_path))
+
+            self.call_from_thread(self._on_storyboard_success, saved_paths)
+
+        except InferenceError as err:
+            err_msg = str(err)
+            self.call_from_thread(self._on_storyboard_error, err_msg)
+        except Exception as err:
+            err_msg = str(err)
+            self.call_from_thread(self._on_storyboard_error, err_msg)
+
+    def _set_storyboard_generating_state(self, state: bool) -> None:
+        self.is_generating_storyboards = state
+
+    def _on_storyboard_success(self, saved_paths: List[str]) -> None:
+        self.is_generating_storyboards = False
+        sb_dir = Path(saved_paths[0]).parent if saved_paths else "storyboards/"
+        self.notify(
+            f"Generated {len(saved_paths)} storyboard images in {sb_dir}",
+            title="Storyboards Generated",
+            severity="information",
+        )
+
+    def _on_storyboard_error(self, err_msg: str) -> None:
+        self.is_generating_storyboards = False
+        self.notify(
+            f"Storyboard generation failed: {err_msg}",
+            title="Storyboard Error",
+            severity="error",
+        )
+
     def update_draw(self, new_draw: Optional[FridayDraw]) -> None:
         """Callback invoked when DrawWizardScreen is dismissed."""
         if new_draw is not None:
@@ -553,8 +758,11 @@ class StudioApp(App):
             self.action_revise_treatment()
         elif event.button.id == "btn_generate_screenplay":
             self.action_generate_screenplay()
+        elif event.button.id == "btn_generate_shotlist":
+            self.action_generate_shotlist()
 
 
 if __name__ == "__main__":
     app = StudioApp()
     app.run()
+

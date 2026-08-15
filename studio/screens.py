@@ -78,7 +78,8 @@ class ApiSettingsScreen(ModalScreen[Optional[dict]]):
     ]
 
     MODEL_CHOICES = [
-        ("gemini-3.6-flash (Default)", "gemini-3.6-flash"),
+        ("gemini-3.7-flash (Default)", "gemini-3.7-flash"),
+        ("gemini-3.6-flash", "gemini-3.6-flash"),
         ("gemini-3.5-flash", "gemini-3.5-flash"),
         ("gemini-3.0-pro", "gemini-3.0-pro"),
     ]
@@ -86,7 +87,7 @@ class ApiSettingsScreen(ModalScreen[Optional[dict]]):
     def compose(self) -> ComposeResult:
         load_dotenv()
         curr_key = os.environ.get("GEMINI_API_KEY", "")
-        curr_model = os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
+        curr_model = os.environ.get("GEMINI_MODEL", "gemini-3.7-flash")
 
         with Container(id="api-dialog"):
             yield Label("⚙️ [bold cyan]API & INFERENCE SETTINGS[/bold cyan]\n", classes="title")
@@ -103,7 +104,7 @@ class ApiSettingsScreen(ModalScreen[Optional[dict]]):
                 yield Label("Gemini Model Family:", classes="field-label")
                 yield Select(
                     self.MODEL_CHOICES,
-                    value=curr_model if curr_model in [m[1] for m in self.MODEL_CHOICES] else "gemini-3.6-flash",
+                    value=curr_model if curr_model in [m[1] for m in self.MODEL_CHOICES] else "gemini-3.7-flash",
                     id="gemini_model",
                     classes="form-field",
                 )
@@ -127,7 +128,7 @@ class ApiSettingsScreen(ModalScreen[Optional[dict]]):
         model_val = (
             str(model_select.value)
             if model_select.value != Select.BLANK and model_select.value is not None
-            else "gemini-3.6-flash"
+            else "gemini-3.7-flash"
         )
 
         dotenv_path = os.path.join(os.getcwd(), ".env")

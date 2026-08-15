@@ -21,7 +21,7 @@ def print_banner() -> None:
     """Print the styled 48HFP-Studio terminal header banner."""
     banner_text = Text()
     banner_text.append(" 🎬 48HFP-Studio ", style="bold gold1 on blue")
-    banner_text.append(" v0.1.1 ", style="bold white on navy_blue")
+    banner_text.append(" v3.0.0 ", style="bold white on navy_blue")
     banner_text.append("\n Terminal-Native AI Co-Pilot for Short Film Festivals", style="italic cyan")
 
     console.print()

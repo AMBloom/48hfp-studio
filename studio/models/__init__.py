@@ -15,6 +15,7 @@ from studio.models.draw import (
     create_default_draw,
 )
 from studio.models.profile import TeamProfile
+from studio.models.shotlist import ShotItem, ShotListBase
 from studio.models.treatment import (
     CharacterRosterItem,
     DialogueSnippetItem,
@@ -44,4 +45,7 @@ __all__ = [
     "DialogueSnippetItem",
     "FestivalComplianceChecklist",
     "TreatmentOutput",
+    "ShotItem",
+    "ShotListBase",
 ]
+

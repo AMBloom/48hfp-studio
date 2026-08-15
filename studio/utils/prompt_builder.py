@@ -14,6 +14,7 @@ from studio.models.constraints import (
 )
 from studio.models.draw import FridayDraw
 from studio.models.profile import TeamProfile
+from studio.models.shotlist import ShotItem
 from studio.models.treatment import TreatmentOutput
 from studio.utils.constraint_store import (
     load_directorial_vision,
@@ -232,6 +233,114 @@ class PromptBuilder:
         sections.append(cls._build_immutable_rules_section(final_draw))
 
         return "\n\n".join(sections)
+
+    @classmethod
+    def compile_shotlist_prompt(
+        cls,
+        screenplay_text: str,
+        profile: Optional[TeamProfile] = None,
+        draw: Optional[FridayDraw] = None,
+    ) -> str:
+        """Compile a shot list prompt instructing LLM to act as a Director of Photography breaking down the screenplay into a StudioBinder shot list."""
+        final_draw = draw or load_draw()
+        final_profile = profile or load_profile()
+
+        sections = []
+
+        # Persona & Directive
+        sections.append(
+            "================================================================================\n"
+            "STUDIOBINDER SHOT LIST BREAKDOWN DIRECTIVE\n"
+            "================================================================================\n"
+            "You are a master Director of Photography (DP) and Unit Production Manager.\n"
+            "Your objective is to analyze the provided short film screenplay and break every scene\n"
+            "down into a comprehensive, highly cinematic, and production-ready StudioBinder shot list."
+        )
+
+        # Global Team State
+        sections.append(cls._build_global_state_section(final_profile))
+
+        # Source Screenplay Text
+        sections.append(
+            "================================================================================\n"
+            "SOURCE SCREENPLAY (.FOUNTAIN)\n"
+            "================================================================================\n"
+            "Base your visual shot breakdown strictly on the Fountain screenplay text below:\n\n"
+            f"{screenplay_text.strip()}"
+        )
+
+        # Shot List Directives
+        sections.append(
+            "================================================================================\n"
+            "SHOT LIST BREAKDOWN DIRECTIVES\n"
+            "================================================================================\n"
+            "Break down every scene into sequential camera shots. For each shot, provide:\n"
+            "1. shot_number: Sequential integer starting at 1.\n"
+            "2. scene_number: Scene heading / number (e.g. '1' or 'INT. CLOCK SHOP - NIGHT').\n"
+            "3. location: Physical filming location.\n"
+            "4. setup: Camera setup identifier (e.g. 'Setup A - Counter').\n"
+            "5. shot_size: Framing size (e.g., ECU, CU, MCU, MS, WS, EWS).\n"
+            "6. camera_movement: Movement or angle (e.g., Static, Pan Left, Tilt Up, Dolly In, Handheld, Steadicam).\n"
+            "7. cast: Array of character names present in this specific shot.\n"
+            "8. description: Detailed visual framing, action, focal point, and narrative beat."
+        )
+
+        # Friday Draw & Immutable Festival Rules (Recency Effect - Absolute Bottom)
+        sections.append(cls._build_draw_section(final_draw))
+        sections.append(cls._build_immutable_rules_section(final_draw))
+
+        return "\n\n".join(sections)
+
+    @classmethod
+    def compile_storyboard_prompt(
+        cls,
+        shot: ShotItem,
+        directorial_vision: Optional[DirectorialVision] = None,
+    ) -> str:
+        """Compile a storyboard image prompt instructing Gemini Image API to render a 16:9 monochrome pre-vis sketch.
+
+        Args:
+            shot: Pydantic ShotItem instance containing shot framing and breakdown.
+            directorial_vision: Optional DirectorialVision providing lighting/color contrast directives.
+
+        Returns:
+            str: Compiled image prompt string.
+        """
+        if directorial_vision is None:
+            profile = load_profile()
+            if profile and profile.active_directorial_vision:
+                directorial_vision = load_directorial_vision(profile.active_directorial_vision)
+
+        lighting_contrast = ""
+        if directorial_vision and directorial_vision.lighting_color:
+            lighting_contrast = f"\nLIGHTING & CONTRAST REFERENCE:\n{directorial_vision.lighting_color}"
+
+        cast_str = ", ".join(shot.cast) if isinstance(shot.cast, list) else str(shot.cast or "N/A")
+
+        return (
+            "STORYBOARD PRE-VIS SKETCH DIRECTIVE\n"
+            "================================================================================\n"
+            "STYLE & FORMAT MANDATE:\n"
+            "• Aspect Ratio: 16:9 widescreen cinematic composition.\n"
+            "• Color Palette: Monochrome, black and white grayscale pencil storyboard sketch.\n"
+            "• Aesthetic: Functional Hollywood pre-visualization storyboard panel, clean line art, high contrast shading.\n"
+            "• STRICT NEGATIVE CONSTRAINTS: NO hyper-realistic photo textures, NO color, NO 3D render artifacts, NO hyper-detailed photorealism.\n\n"
+            "SHOT & STAGING DETAILS:\n"
+            f"• Shot Number: {shot.shot_number}\n"
+            f"• Scene Number / Heading: {shot.scene_number}\n"
+            f"• Location: {shot.location}\n"
+            f"• Setup: {shot.setup}\n"
+            f"• Shot Size & Framing: {shot.shot_size}\n"
+            f"• Camera Movement / Perspective: {shot.camera_movement}\n"
+            f"• Characters Present: {cast_str}\n"
+            f"• Visual Action & Framing Description: {shot.description}\n"
+            f"{lighting_contrast}\n\n"
+            "COMPOSITION FOCUS:\n"
+            "Emphasize rule of thirds, actor depth and blocking, focal framing, clear silhouettes, "
+            "and narrative clarity matching the shot size and camera perspective above."
+        )
+
+
 
 
     @staticmethod
