@@ -28,3 +28,7 @@ outputs/
 implementation_plan*.md
 walkthrough*.md
 task.md
+
+# IDE Clutter
+.obsidian/
+
