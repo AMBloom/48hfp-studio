@@ -22,7 +22,7 @@ class TeamProfile(BaseModel):
     )
     cast: List[Dict[str, str]] = Field(
         default_factory=list,
-        description="Actor details with keys for name, age_range, gender, physicality",
+        description="Actor details with keys: name, age_range, gender, ethnicity, hair, build, visual_anchor, physicality",
     )
     available_gear: List[str] = Field(
         default_factory=list,
@@ -53,12 +53,27 @@ class TeamProfile(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def migrate_legacy_roles(cls, data: Any) -> Any:
-        """Migrate legacy 'roles' field to 'crew' if 'crew' is not present."""
+    def migrate_legacy_fields(cls, data: Any) -> Any:
+        """Migrate legacy roles and cast format."""
         if isinstance(data, dict):
             if "roles" in data and "crew" not in data:
                 data["crew"] = data.pop("roles")
+            if "cast" in data and isinstance(data["cast"], list):
+                migrated_cast = []
+                for item in data["cast"]:
+                    if isinstance(item, dict):
+                        c = dict(item)
+                        c.setdefault("ethnicity", "Unspecified")
+                        c.setdefault("hair", "Unspecified")
+                        c.setdefault("build", "Unspecified")
+                        c.setdefault("visual_anchor", "None")
+                        if "physicality" not in c:
+                            parts = [c["ethnicity"], c["hair"], c["build"]]
+                            c["physicality"] = ", ".join([p for p in parts if p != "Unspecified"]) or "Unspecified"
+                        migrated_cast.append(c)
+                data["cast"] = migrated_cast
         return data
+
 
     @property
     def roles(self) -> Dict[str, List[str]]:

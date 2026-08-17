@@ -119,7 +119,8 @@ def test_stores_path_resolution_with_active_workspace(tmp_path):
         ),
     )
     saved_t = save_treatment_output(treatment)
-    assert saved_t.parent == ws_dir / "outputs"
+    assert saved_t.parent == ws_dir / "projects" / "Space_Fiasco"
+    assert saved_t.name == "treatment_v01.md"
     assert saved_t.exists()
 
 
@@ -133,6 +134,7 @@ def test_cli_workspace_commands(tmp_path):
     assert "Initialized new project workspace" in result.output
     assert ws_path.exists()
     assert (ws_path / "constraints" / "logistical").exists()
+    assert (ws_path / "projects").exists()
     assert (ws_path / "outputs").exists()
     assert get_active_workspace() == ws_path.resolve()
 

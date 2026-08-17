@@ -17,21 +17,30 @@ from studio.utils.treatment_store import sanitize_filename_part
 
 
 def get_next_shotlist_version_number(assets_dir: Path) -> int:
-    """Scan assets directory for existing shotlists and compute next version number.
+    """Scan directory for existing shotlists and compute next version number.
 
+    Supports encapsulated format (shotlist_v01.csv) and legacy format (shotlist_v01_...csv).
     Defaults safely to 1 if no shotlist CSV files exist or if directory is empty.
     """
     if not assets_dir.exists():
         return 1
 
-    pattern = re.compile(r"^shotlist_v(\d+)_", re.IGNORECASE)
+    encapsulated_pattern = re.compile(r"^shotlist_v(\d+)\.csv$", re.IGNORECASE)
+    legacy_pattern = re.compile(r"^shotlist_v(\d+)_", re.IGNORECASE)
     versions: List[int] = []
 
     for file_path in assets_dir.glob("shotlist_v*.csv"):
-        match = pattern.match(file_path.name)
-        if match:
+        enc_match = encapsulated_pattern.match(file_path.name)
+        if enc_match:
             try:
-                versions.append(int(match.group(1)))
+                versions.append(int(enc_match.group(1)))
+                continue
+            except ValueError:
+                pass
+        leg_match = legacy_pattern.match(file_path.name)
+        if leg_match:
+            try:
+                versions.append(int(leg_match.group(1)))
             except ValueError:
                 continue
 
@@ -45,29 +54,45 @@ def save_shotlist_csv(
     shotlist: ShotListBase,
     title: str = "Untitled",
     assets_dir: Optional[Path] = None,
+    project_dir: Optional[Path] = None,
 ) -> Path:
     """Safely export ShotListBase to CSV file using pandas with auto-incrementing zero-padded version.
 
-    Target directory: `<workspace>/assets`
-    Version format: shotlist_v01_<title>_<timestamp>.csv
+    Default target: `<workspace_root>/projects/<Clean_Project_Title>/shotlist_v01.csv`.
+    If `assets_dir` is explicitly supplied, preserves flat output for backward compatibility.
     Safe-Write System: Ensures previous outputs are NEVER overwritten.
     """
-    target_dir = assets_dir or (get_workspace_root() / "assets")
-    target_dir.mkdir(parents=True, exist_ok=True)
-
     clean_title = sanitize_filename_part(title or shotlist.title or "Untitled")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    version = get_next_shotlist_version_number(target_dir)
+    if assets_dir is not None:
+        target_dir = assets_dir
+        target_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    while True:
-        version_str = f"v{version:02d}"
-        filename = f"shotlist_{version_str}_{clean_title}_{timestamp}.csv"
-        file_path = target_dir / filename
+        version = get_next_shotlist_version_number(target_dir)
 
-        if not file_path.exists():
-            break
-        version += 1
+        while True:
+            version_str = f"v{version:02d}"
+            filename = f"shotlist_{version_str}_{clean_title}_{timestamp}.csv"
+            file_path = target_dir / filename
+
+            if not file_path.exists():
+                break
+            version += 1
+    else:
+        target_dir = project_dir or (get_workspace_root() / "projects" / clean_title)
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        version = get_next_shotlist_version_number(target_dir)
+
+        while True:
+            version_str = f"v{version:02d}"
+            filename = f"shotlist_{version_str}.csv"
+            file_path = target_dir / filename
+
+            if not file_path.exists():
+                break
+            version += 1
 
     # Convert Pydantic ShotItems into pandas DataFrame
     rows = []
@@ -103,29 +128,50 @@ def save_shotlist_csv(
 
 
 def list_saved_shotlists(assets_dir: Optional[Path] = None) -> List[Dict[str, str]]:
-    """Scan workspace assets/ directory and return list of shot list metadata dictionaries.
+    """Scan workspace for saved shot lists and return list of shot list metadata dictionaries.
 
+    Discovers shot lists from both legacy flat directories and encapsulated project folders.
     Returns dicts with keys: 'filename', 'version', 'title', 'path', 'mtime', 'formatted_date'.
     Sorted by mtime descending (newest first).
     """
-    target_dir = assets_dir or (get_workspace_root() / "assets")
-    if not target_dir.exists():
-        return []
+    candidate_paths: List[Path] = []
+
+    if assets_dir is not None:
+        if assets_dir.exists():
+            candidate_paths.extend(assets_dir.glob("shotlist_v*.csv"))
+    else:
+        ws_root = get_workspace_root()
+        legacy_dir = ws_root / "assets"
+        if legacy_dir.exists():
+            candidate_paths.extend(legacy_dir.glob("shotlist_v*.csv"))
+
+        projects_dir = ws_root / "projects"
+        if projects_dir.exists():
+            candidate_paths.extend(projects_dir.glob("*/shotlist_v*.csv"))
 
     results: List[Dict[str, str]] = []
-    pattern = re.compile(r"^shotlist_v(\d+)_(.+)_\d{8}_\d{6}\.csv$", re.IGNORECASE)
+    seen_paths = set()
+    legacy_pattern = re.compile(r"^shotlist_v(\d+)_(.+)_\d{8}_\d{6}\.csv$", re.IGNORECASE)
+    encapsulated_pattern = re.compile(r"^shotlist_v(\d+)\.csv$", re.IGNORECASE)
 
-    for p in target_dir.glob("shotlist_v*.csv"):
-        if not p.is_file():
+    for p in candidate_paths:
+        if not p.is_file() or str(p.resolve()) in seen_paths:
             continue
+        seen_paths.add(str(p.resolve()))
+
         stat = p.stat()
         mtime = stat.st_mtime
         formatted_date = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S")
 
-        match = pattern.match(p.name)
-        if match:
-            version_str = f"v{int(match.group(1)):02d}"
-            raw_title = match.group(2).replace("_", " ")
+        leg_match = legacy_pattern.match(p.name)
+        enc_match = encapsulated_pattern.match(p.name)
+
+        if leg_match:
+            version_str = f"v{int(leg_match.group(1)):02d}"
+            raw_title = leg_match.group(2).replace("_", " ")
+        elif enc_match:
+            version_str = f"v{int(enc_match.group(1)):02d}"
+            raw_title = p.parent.name.replace("_", " ")
         else:
             version_str = "v--"
             raw_title = p.stem
@@ -178,14 +224,22 @@ def save_storyboard_image(
     shot_number: int,
     scene_number: str,
     storyboards_dir: Optional[Path] = None,
+    project_dir: Optional[Path] = None,
+    title: str = "Untitled",
 ) -> Path:
-    """Save storyboard image bytes to local storage in storyboards/ directory.
+    """Save storyboard image bytes to local storage in project images/ directory.
 
-    Target directory: `<active_workspace>/storyboards`
+    Default target: `<active_workspace>/projects/<Clean_Title>/images/`
     Filename format: `shot_{shot_number:03d}_scene_{scene_clean}.png`
     Auto-creates target directory if missing.
     """
-    target_dir = storyboards_dir or (get_workspace_root() / "storyboards")
+    clean_title = sanitize_filename_part(title or "Untitled")
+    if storyboards_dir is not None:
+        target_dir = storyboards_dir
+    else:
+        base_proj = project_dir or (get_workspace_root() / "projects" / clean_title)
+        target_dir = base_proj / "images"
+
     target_dir.mkdir(parents=True, exist_ok=True)
 
     scene_clean = sanitize_filename_part(str(scene_number or "1"))

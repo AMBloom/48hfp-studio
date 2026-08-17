@@ -156,7 +156,7 @@ class ThematicFramework(BaseModel):
 
 
 class IdeaSeed(BaseModel):
-    """User-defined Idea Seed constraint set (inciting incident, complications, ending targets)."""
+    """User-defined Idea Seed constraint set (inciting incident, complications, ending targets, cast size)."""
 
     name: str = Field(..., description="Unique slug identifier (e.g. late_night_visitor)")
     description: str = Field(default="", description="Brief summary of this idea seed")
@@ -172,6 +172,10 @@ class IdeaSeed(BaseModel):
         default="",
         description="Resolution direction, twist ending, or final emotional lingering note",
     )
+    max_actors: Optional[int] = Field(
+        default=None,
+        description="Recommended maximum actor count for this scenario (None = flexible/unlimited)",
+    )
     created_at: str = Field(default_factory=current_iso_timestamp)
     updated_at: str = Field(default_factory=current_iso_timestamp)
 
@@ -184,7 +188,16 @@ class IdeaSeed(BaseModel):
             raise ValueError("Constraint name cannot be empty")
         return slug
 
+    @field_validator("max_actors")
+    @classmethod
+    def validate_max_actors(cls, v: Optional[int]) -> Optional[int]:
+        """Ensure max_actors is a positive integer if provided."""
+        if v is not None and v <= 0:
+            raise ValueError("max_actors must be a positive integer greater than 0")
+        return v
+
     def update_timestamp(self) -> None:
         """Update the updated_at timestamp to current time."""
         self.updated_at = current_iso_timestamp()
+
 

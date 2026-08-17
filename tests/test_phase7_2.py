@@ -143,7 +143,8 @@ def test_prompt_builder_renders_crew_cast_gear_set_dressing():
 
     assert "1. GLOBAL PRODUCTION TEAM STATE & RESOURCES" in prompt
     assert "• Director: Dave" in prompt
-    assert "• Elena: Age 30s, Gender: Female, Physicality: Tall, dark hair" in prompt
+    assert "Elena" in prompt
+    assert "Tall, dark hair" in prompt
     assert "• Sony FX6" in prompt
 
     assert "5. ACTIVE LOGISTICAL CONSTRAINT SET" in prompt
@@ -153,7 +154,7 @@ def test_prompt_builder_renders_crew_cast_gear_set_dressing():
 
 @pytest.mark.anyio
 async def test_profile_setup_screen_with_cast_and_gear(tmp_path):
-    """Verify ProfileSetupScreen inputs crew, 4-input cast, and gear catalog."""
+    """Verify ProfileSetupScreen inputs crew, cast, and gear catalog."""
     profile_file = tmp_path / ".48hfp_profile.yaml"
 
     with patch("studio.utils.profile_store.get_profile_path", return_value=profile_file):
@@ -168,12 +169,20 @@ async def test_profile_setup_screen_with_cast_and_gear(tmp_path):
             screen.query_one("#admin_username", Input).value = "apex_admin"
             screen.query_one("#location", Input).value = "Denver, CO"
 
-            # Add Cast member (4 inputs)
-            screen.query_one("#cast_name", Input).value = "Taylor"
-            screen.query_one("#cast_age", Input).value = "40s"
-            screen.query_one("#cast_gender", Input).value = "Male"
-            screen.query_one("#cast_physicality", Input).value = "Bearded, rugged"
-            screen.query_one("#add_cast_btn").press()
+            # Add Cast member via cast list
+            screen.cast.append(
+                {
+                    "name": "Taylor",
+                    "age_range": "40s",
+                    "gender": "Male",
+                    "ethnicity": "Unspecified",
+                    "hair": "Unspecified",
+                    "build": "Unspecified",
+                    "visual_anchor": "None",
+                    "physicality": "Bearded, rugged",
+                }
+            )
+            screen.refresh_cast_table()
             await pilot.pause()
 
             assert len(screen.cast) == 1

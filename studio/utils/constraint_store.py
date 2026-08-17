@@ -283,7 +283,35 @@ def seed_default_constraints() -> Tuple[Optional[Path], Optional[Path], Optional
             locations=["Exterior", "Park", "Day"],
             sub_locations=["Basketball Court", "Park Bench", "Parking Lot"],
             location_details="Variable weather and lighting conditions, uncontrolled background extras, ambient wind, and distant traffic noise.",
-            available_set_dressing=["Chainlink fences", "A parked 2022 Honda Accord 2.0T Sport sedan", "Abandoned basketball"],
+            available_set_dressing=["Chainlink fences", "Parked generic commuter sedan", "Abandoned basketball"],
+        ),
+        LogisticalConstraint(
+            name="late_night_diner_coffee_shop",
+            locations=["Interior", "Commercial", "Night"],
+            sub_locations=["Corner Vinyl Booth", "Service Counter / Stools", "Kitchen Pass-Through Window"],
+            location_details="Warm neon bounce through rainy exterior windows, reflective linoleum flooring, hum of refrigeration and espresso steam.",
+            available_set_dressing=["Glass sugar dispensers", "Laminated menus", "Coffee pot warmers", "Chrome napkin holders", "Condiment caddy"],
+        ),
+        LogisticalConstraint(
+            name="public_park",
+            locations=["Exterior", "Civic", "Day/Golden Hour"],
+            sub_locations=["Weathered Park Bench", "Walking Trail Perimeter", "Under Concrete Pavilion"],
+            location_details="Dappled natural sunlight through tree canopies, ambient birds and distant traffic rumble, wide open sightlines.",
+            available_set_dressing=["Cast iron trash receptacle", "Faded wooden picnic table", "Chainlink fence perimeter", "Discarded newspapers"],
+        ),
+        LogisticalConstraint(
+            name="stationary_sedan",
+            locations=["Interior", "Vehicle", "Day/Night"],
+            sub_locations=["Driver & Passenger Front Seats", "Backseat Bench", "Vehicle Trunk / Cargo Area"],
+            location_details="Cramped acoustic isolation with muffled exterior sounds, reflection on windshield and side glass, dashboard instrument backlighting.",
+            available_set_dressing=["Hanging rear-view air freshener", "Dashboard phone mount", "Glove compartment papers", "Travel coffee tumbler", "Aux cord / charging cables"],
+        ),
+        LogisticalConstraint(
+            name="the_laundromat",
+            locations=["Interior", "Commercial", "Day/Night"],
+            sub_locations=["Row of Front-Load Washers", "Folding Table Area", "Vending Machine & Coin Dispenser Alcove"],
+            location_details="Rhythmic mechanical thrumming and sloshing audio, warm humid air, industrial fluorescent tube lighting with subtle green/yellow tint.",
+            available_set_dressing=["Plastic laundry baskets", "Coin changers", "Rolling metal laundry carts", "Detergent soap bottles", "Wall-mounted instructional signage"],
         ),
         LogisticalConstraint(
             name="office_building",
@@ -314,16 +342,47 @@ def seed_default_constraints() -> Tuple[Optional[Path], Optional[Path], Optional
             if logistical_path is None:
                 logistical_path = p
 
-
-    if not list_idea_seeds():
-        default_idea = IdeaSeed(
+    idea_setups = [
+        IdeaSeed(
             name="late_night_visitor",
             description="An unexpected arrival disrupts a fragile quiet night.",
             inciting_incident="Two long-lost acquaintances reunite under suspicious circumstances during a citywide power outage.",
             complications="A lost key, hidden motives, and a sudden knock at the back door.",
             ending_targets="A tense standoff resolving in an unexpected gesture of forgiveness.",
-        )
-        ideas_path = save_idea_seed(default_idea)
+            max_actors=2,
+        ),
+        IdeaSeed(
+            name="misdirected_package",
+            description="A delivery arrives at the wrong address containing an item that cannot be ignored or easily returned.",
+            inciting_incident="A courier delivers a heavy, unlabelled parcel to a reclusive tenant; when accidentally opened, it reveals something unexpected and time-sensitive.",
+            complications="The intended recipient comes searching for it; a neighbor notices the delivery; the contents begin to malfunction or attract unwanted attention.",
+            ending_targets="A choice between returning the parcel at personal risk or disposing of it before consequences catch up.",
+            max_actors=2,
+        ),
+        IdeaSeed(
+            name="expired_deadline",
+            description="Characters scramble in the final hour before an irreversible deadline with everything on the line.",
+            inciting_incident="A critical submission, ransom, or legal window is closing in sixty minutes, and an essential document or key component is missing.",
+            complications="A vital teammate vanishes or is unreachable; a key piece of tech fails; an unexpected inspector or visitor arrives unannounced.",
+            ending_targets="A photo-finish resolution where the outcome is secured through an unconventional compromise rather than the original plan.",
+            max_actors=3,
+        ),
+        IdeaSeed(
+            name="uninvited_confessor",
+            description="A stranger or estranged acquaintance enters an everyday setting and unburdens a shocking secret.",
+            inciting_incident="While occupying a quiet space, an uninvited individual sits down and reveals complicity in an unresolved incident involving the protagonist.",
+            complications="The protagonist cannot leave without raising suspicion; the confessor's story conflicts with known facts; a third party threatens to overhear.",
+            ending_targets="A psychological turning point where the listener must decide whether to forgive, report, or weaponize the confession.",
+            max_actors=2,
+        ),
+    ]
+
+    for idea in idea_setups:
+        if not load_idea_seed(idea.name):
+            p = save_idea_seed(idea)
+            if ideas_path is None:
+                ideas_path = p
+
 
     # Mass Seed all 12 Director Archetype Constraint Pairs
     director_archetypes = [

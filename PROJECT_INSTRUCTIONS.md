@@ -1,63 +1,84 @@
-# 48HFP-Studio: Master Application Bible (v3.0.0 - Studio-in-a-Box Edition)
+# 48HFP-Studio: Master Application Bible (v3.0 - The Studio-in-a-Box Edition)
 
 ## 1. Project Overview & Vision
-48HFP-Studio is an open-source, terminal-native AI co-pilot designed for indie film teams. Transitioned in v3.0 to a comprehensive "Studio-in-a-Box," the application manages the entire pre-production workflow: from concept ideation and interactive onboarding to treatment generation, scriptwriting, and production asset creation (shot lists and storyboards). 
+**48HFP-Studio** is an open-source, terminal-native AI co-pilot designed for indie film teams competing in the 48 Hour Film Project or similar short film festivals. Operating as a stateful Terminal User Interface (TUI), the application provides a high-speed, lightweight pre-production operating system.
 
-It operates via a Textual-powered stateful Terminal User Interface (TUI) with a split-pane dashboard, while maintaining headless CLI subcommands. The engine generates deterministic, 100% compliant outputs by ingesting modular, user-defined "Constraint Sets" alongside the official Friday Night Draw.
+Evolving beyond simple ideation, v3.0 transforms the application into a complete "Studio-in-a-Box." It accommodates both "Planners" (who pre-arrange modular constraints) and "Pantsers" (who require a rapid dashboard after the Friday draw). The application acts as a cognitive load reducer, enforcing immutable festival rules and driving the creative pipeline from initial concept to a finished Markdown treatment, a `.fountain` screenplay, a `.csv` camera shot list, and rendered `.png` pre-vis storyboards.
 
 ## 2. Environment & Tech Stack
-*   **Target OS:** Cross-platform (Developed on Ubuntu 24.04 LTS)
+*   **Target OS:** Cross-platform (Developed on Ubuntu Linux)
 *   **Runtime:** Python 3.11+
-*   **Frameworks:** `textual` (TUI dashboard), `typer` (CLI routing), `rich` (terminal UI)
+*   **TUI Framework:** `textual` (for persistent, stateful terminal dashboard rendering)
 *   **Data Validation:** `pydantic` v2
-*   **Storage:** `PyYAML` (human-readable config/constraint files)
-*   **LLM Orchestration:** `google-genai` SDK (Primary text inference). 
-*   **Data Output:** `pandas` (for spreadsheet/shot list generation), standard `.fountain` (plain-text screenplays).
-
-## 3. Global State & Persistent Workspaces
-The application relies on persistent workspaces to allow portability across devices.
-*   **Team Profile:** (`~/.48hfp_profile.yaml`) Stores Team Name, Admin, Location, segmented Crew and Cast rosters (with physical descriptions), and an Available Gear catalog.
-*   **Project Workspaces:** A sandboxed environment system to store specific constraints, draws, treatments, and scripts together.
-
-## 4. The Unified Constraint Architecture
-Generative inputs are treated as modular "Constraint Sets."
-*   **A. Immutable Festival Rules:** Hard-coded engine constraints (4-7 min runtime, required prop usage, verbatim dialog rule, required character linkage).
-*   **B. Logistical Constraints:** Physical shoot reality (locations, available set dressing/wardrobe).
-*   **C. Directorial Vision:** Visual economy, lighting/color intent, and audio landscape.
-*   **D. Thematic Framework:** Core philosophy, emotional arc, and world rules.
-*   **E. Idea Seeds:** Inciting incident, complications, and ending targets.
-*   **F. The Friday Night Draw:** Ephemeral kickoff data (Genres, Character, Prop, Line).
-
-## 5. Prompt Engineering & Inference Architecture
-The System Prompt Builder enforces **The Recency Effect**. LLMs prioritize instructions at the bottom of the prompt.
-*   **Hierarchy:** Persona -> Global State (Crew/Cast/Gear) -> Directorial Vision -> Thematic Framework -> Idea Seed -> Logistical Constraints -> Transient User Directives -> Output Schema -> Friday Draw -> **Immutable Rules (The Anchor)**.
-
-## 6. Output Versioning & File System
-To protect against data loss during a 48-hour sprint, the app never overwrites previous outputs. 
-*   Files are automatically named using the active constraint sets and a timestamp: `treatment_v[XX]_[Title]_[Logistical]_[Directorial]_[Thematic]_[Idea]_[Timestamp].md`.
+*   **Configuration Storage:** `PyYAML`
+*   **Data Processing:** `pandas` (for CSV shot list extraction)
+*   **LLM Orchestration:** `google-genai` SDK 
+    *   *Text Engine:* `gemini-3.7-flash` (Complex coding, multi-step execution, strict JSON schema adherence)
+    *   *Image Engine:* `gemini-3.1-flash-lite-image` (Nano Banana 2 Lite for native 16:9 storyboard generation)
 
 ---
 
-## Development Roadmap (v3.x)
+## 3. The TUI UX Paradigm: Split-Pane Workspaces
+The application utilizes a persistent, keyboard-driven dashboard layout with specific workspace views.
 
-### ✅ Completed Phases (v1.0 - v2.0)
-*   **Phase 1-4:** Core CLI Scaffolding, PyYAML Data Models, Friday Draw Wizard, Hierarchical Prompt Compiler, and Gemini Inference Engine.
-*   **Phase 5-6:** Textual TUI Scaffolding, Live Widget Binding, Modal Forms, and Split-Pane Workspace.
-*   **Phase 7:** Tri-Split Architecture (Directorial, Thematic, Idea Seed refactor), Cast/Crew Segmentation, Gear Inventory, and UI Stabilization.
+*   **The Persistent Header (HUD):** A top bar displaying Global State, Team Name, and currently active constraint sets.
+*   **The Navigation Sidebar (Left Pane):** A vertical menu for jumping between core modals (Profile, Library, Quiz, Draw, Drafts, Settings).
+*   **The Treatment Workspace:** 
+    *   *Left Split (The Recipe):* A fast, editable summary of active constraints, draw parameters, and custom directives.
+    *   *Right Split (The Output):* The generated treatment rendered in Markdown, alongside a bottom-docked Revision Pane for iterative LLM prompting.
+*   **The Screenplay Workspace:** A paginated, 50-line portrait paper view featuring custom Regex highlighting for `.fountain` screenplay syntax.
+*   **The Shot List Workspace:** A `DataTable` view rendering the extracted StudioBinder-style shot list, equipped with an asynchronous background worker for generating pre-vis storyboard frames.
 
-### 🚀 Current Expansion: Studio-in-a-Box (v3.0+)
+---
 
-**Phase 8: Project Workspaces & Interactive Onboarding**
-*   **Sprint 8.1:** Persistent Project Setup (Transitioning from a global default sandbox to named project directories for portability).
-*   **Sprint 8.2:** The Filmmaker Personality Quiz (Curating ~12 visionary director archetypes and routing users to default constraint sets via a gamified onboarding wizard).
+## 4. Global State & The Unified Constraint Architecture
+All generative inputs are modular objects that can be saved, edited, and hot-swapped depending on real-world conditions.
 
-**Phase 9: Iterative Development**
-*   **Sprint 9.1:** Treatment Revision Engine (Allowing users to modify a generated treatment via conversational change requests while enforcing the exact Pydantic output schema).
+**A. Team Configuration (Global State)**
+Persistent variables stored in `~/.48hfp_profile.yaml` (or workspace-local `profile.yaml`):
+*   Production Team Name, Admin Username, Location
+*   Team Roster by Role, Cast details, and Available Gear
 
-**Phase 10: The Screenplay Engine**
-*   **Sprint 10.1:** Generative Screenplays (Feeding the locked treatment + constraints to generate a working draft).
-*   **Sprint 10.2:** Fountain Format Integration (Standardizing on the open-source `.fountain` format for plain-text screenwriting, allowing export/import to industry-standard software without PDF parsing nightmares).
+**B. Immutable Festival Rules (Engine Constraints)**
+Hard-coded into the prompt compiler to guarantee compliance:
+*   **Runtime:** Script pacing targets 4 to 7 minutes.
+*   **Required Prop:** Must be physically seen and actively used.
+*   **Required Line:** Must be spoken/written VERBATIM.
+*   **Required Character:** Name and trait must belong to the same on-screen entity.
 
-**Phase 11: Production Assets**
-*   **Sprint 11.1:** StudioBinder Shot Lists (Parsing the screenplay and constraints to output an actionable `.xlsx`/`.csv` shot list using Pandas).
-*   **Sprint 11.2:** Pre-Vis Storyboarding (Generating highly constrained, 16:9 monochrome "pre-vis" image prompts and compiling them into a local HTML viewer).
+**C. Mutable Constraint Sets (YAML Library)**
+*   **Logistical Sets:** Define physical shoot reality.
+*   **Directorial Visions:** Define visual economy, lighting, and audio.
+*   **Thematic Frameworks:** Define core philosophy and emotional arcs.
+*   **Idea Seeds:** Short, pre-baked story scenarios or hooks.
+
+**D. The Friday Night Draw**
+Entered at kickoff. Blank fields are auto-generated by fallback logic.
+
+---
+
+## 5. Prompt Engineering & Versioned File System
+**The Recency Effect:** The Prompt Builder enforces extreme reliability by anchoring Immutable Rules at the absolute bottom of the LLM context window. Prompt hierarchies are dynamically compiled for Treatments, Revisions, Screenplays, Shot Lists, and Storyboards.
+
+**Output Versioning (Safe-Write):**
+*   All outputs use a zero-padded, non-overwrite versioning system (e.g., `v01`, `v02`).
+*   Treatments (`outputs/`), Screenplays (`screenplays/`), Shot Lists (`assets/`), and Storyboards (`storyboards/`) are stored locally within the active project workspace.
+
+---
+
+## 6. Completed Development & Roadmap
+
+### ✅ Completed: Phases 5-8 (TUI & Constraint Logic)
+Transitioned from Typer CLI to Textual TUI. Built persistent HUD, Library CRUD modals, interactive Filmmaker Quiz, and the split-pane Treatment generator.
+
+### ✅ Completed: Phase 9 (Treatment Revision Engine)
+Implemented a stateless token-conservation revision loop. Users can submit "director's notes" to surgically alter the treatment without breaking festival constraints.
+
+### ✅ Completed: Phase 10 (The Screenplay Engine)
+Extended the pipeline to adapt JSON treatments into production-ready `.fountain` scripts. Built a paginated syntax-highlighting workspace view.
+
+### ✅ Completed: Phase 11 (StudioBinder Shot Lists & Pre-Vis)
+Extracted structural shot lists from screenplays, rendered them in DataTables, and exported to Pandas CSVs. Integrated the `gemini-3.1-flash-lite-image` multimodal endpoint to autonomously generate 16:9 monochrome storyboard frames.
+
+### 🚧 Current: Phase 12 (v3.1 Tech Debt & Roadmap)
+**Objective:** Comprehensive testing, documenting observations, addressing accumulated tech debt, and defining the feature roadmap for subsequent v4.0 development sprints.

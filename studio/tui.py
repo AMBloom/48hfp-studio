@@ -19,6 +19,7 @@ from studio.screens_load import LoadDraftsScreen
 from studio.screens_quiz import OnboardingQuizScreen
 from studio.screens_screenplay import ScreenplayWorkspace
 from studio.screens_shotlist import ShotListWorkspace
+from studio.screens_storyboard import StoryboardsWorkspace
 from studio.screens_workspace import WorkspaceManagerScreen
 from studio.utils.asset_store import save_shotlist_csv, save_storyboard_image
 from studio.utils.draw_store import load_draw
@@ -30,7 +31,7 @@ from studio.utils.treatment_store import (
     convert_treatment_to_markdown,
     save_treatment_output,
 )
-from studio.workspace import DEFAULT_WELCOME_MARKDOWN, StudioWorkspace
+from studio.workspace import DEFAULT_WELCOME_MARKDOWN, RecipePane, StudioWorkspace
 
 
 class HeaderHUD(Static):
@@ -76,6 +77,10 @@ class HeaderHUD(Static):
 class NavigationSidebar(Static):
     """Persistent Left Navigation Sidebar widget."""
 
+    profile: reactive[Optional[TeamProfile]] = reactive(None)
+    draw: reactive[Optional[FridayDraw]] = reactive(None)
+    active_view: reactive[str] = reactive("treatment")
+
     DEFAULT_CSS = """
     NavigationSidebar {
         width: 34;
@@ -86,20 +91,81 @@ class NavigationSidebar(Static):
         padding: 1 2;
     }
 
+    .nav-section-label {
+        color: $accent;
+        text-style: bold;
+        margin-top: 1;
+        margin-bottom: 0;
+    }
+
     NavigationSidebar Button {
         width: 100%;
         margin-top: 1;
     }
     """
 
+    def watch_profile(self, profile: Optional[TeamProfile]) -> None:
+        self.update_badges()
+
+    def watch_draw(self, draw: Optional[FridayDraw]) -> None:
+        self.update_badges()
+
+    def update_badges(self) -> None:
+        try:
+            btn_prof = self.query_one("#btn_profile_modal", Button)
+            btn_prof.label = f"👤 Profile: {self.profile.team_name[:12]}" if self.profile else "👤 Team Profile [P]"
+        except Exception:
+            pass
+        try:
+            btn_draw = self.query_one("#btn_draw_modal", Button)
+            btn_draw.label = f"🎲 Draw: {self.draw.genre_1[:10]}" if self.draw else "🎲 Friday Draw [D]"
+        except Exception:
+            pass
+
     def compose(self) -> ComposeResult:
-        yield Button("👤 Profile Setup [P]", id="btn_profile_modal", variant="default")
-        yield Button("📂 Workspace Manager [W]", id="btn_workspace_modal", variant="default")
-        yield Button("📂 Load Drafts [O]", id="btn_load_drafts", variant="default")
-        yield Button("🔮 Filmmaker Quiz [Z]", id="btn_quiz_modal", variant="default")
-        yield Button("📚 Constraints [L]", id="btn_library_modal", variant="default")
-        yield Button("🎲 Friday Draw [D]", id="btn_draw_modal", variant="primary")
-        yield Button("⚙️ Settings [S]", id="btn_settings_modal", variant="default")
+        yield Label("📋 WORKSPACE VIEWS", classes="nav-section-label")
+        yield Button(
+            "📝 Treatment [1]",
+            id="btn_nav_treatment",
+            variant="primary" if self.active_view == "treatment" else "default",
+        )
+        yield Button(
+            "📜 Screenplay [2]",
+            id="btn_nav_screenplay",
+            variant="primary" if self.active_view == "screenplay" else "default",
+        )
+        yield Button(
+            "🎥 Shot List [3]",
+            id="btn_nav_shotlist",
+            variant="primary" if self.active_view == "shotlist" else "default",
+        )
+        yield Button(
+            "🖼️ Storyboards [4]",
+            id="btn_nav_storyboards",
+            variant="primary" if self.active_view == "storyboards" else "default",
+        )
+
+        yield Label("⚙️ PROJECT SETUP", classes="nav-section-label")
+        yield Button("👤 Team Profile [P]", id="btn_profile_modal")
+        yield Button("📁 Workspace Manager [W]", id="btn_workspace_modal")
+        yield Button("📂 Load Saved Drafts [O]", id="btn_load_drafts")
+        yield Button("❓ Creative Quiz [Q]", id="btn_quiz_modal")
+        yield Button("📚 Constraint Library [C]", id="btn_library_modal")
+        yield Button("🎲 Friday Draw [D]", id="btn_draw_modal")
+        yield Button("⚙️ Settings [S]", id="btn_settings_modal")
+
+    def watch_active_view(self, active_view: str) -> None:
+        try:
+            b1 = self.query_one("#btn_nav_treatment", Button)
+            b2 = self.query_one("#btn_nav_screenplay", Button)
+            b3 = self.query_one("#btn_nav_shotlist", Button)
+            b4 = self.query_one("#btn_nav_storyboards", Button)
+            b1.variant = "primary" if active_view == "treatment" else "default"
+            b2.variant = "primary" if active_view == "screenplay" else "default"
+            b3.variant = "primary" if active_view == "shotlist" else "default"
+            b4.variant = "primary" if active_view == "storyboards" else "default"
+        except Exception:
+            pass
 
 
 class StudioApp(App):
@@ -120,15 +186,8 @@ class StudioApp(App):
     is_generating_screenplay: reactive[bool] = reactive(False)
     current_shotlist_data: reactive[Any] = reactive(None)
     is_generating_shotlist: reactive[bool] = reactive(False)
+    current_storyboards_data: reactive[List[str]] = reactive([])
     is_generating_storyboards: reactive[bool] = reactive(False)
-
-    def watch_is_generating_storyboards(self, is_gen: bool) -> None:
-        """Push is_generating_storyboards state down to ShotListWorkspace."""
-        try:
-            sl = self.query_one("#shotlist-workspace", ShotListWorkspace)
-            sl.is_generating_storyboards = is_gen
-        except Exception:
-            pass
 
     CSS = """
     Screen {
@@ -144,6 +203,10 @@ class StudioApp(App):
     """
 
     BINDINGS = [
+        ("1", "switch_to_treatment_view", "Treatment [1]"),
+        ("2", "switch_to_screenplay_view", "Screenplay [2]"),
+        ("3", "switch_to_shotlist_view", "Shot List [3]"),
+        ("4", "switch_to_storyboard_view", "Storyboards [4]"),
         ("p", "open_profile_setup", "Profile Setup"),
         ("w", "open_workspace_manager", "Workspace Manager"),
         ("o", "open_load_drafts", "Load Drafts"),
@@ -164,6 +227,7 @@ class StudioApp(App):
             yield StudioWorkspace(id="main-workspace")
             yield ScreenplayWorkspace(id="screenplay-workspace")
             yield ShotListWorkspace(id="shotlist-workspace")
+            yield StoryboardsWorkspace(id="storyboard-workspace")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -173,23 +237,20 @@ class StudioApp(App):
         self.watch_active_view(self.active_view)
 
     def watch_active_view(self, active_view: str) -> None:
-        """Toggle active workspace view among Treatment, Screenplay, and ShotList."""
+        """Toggle active workspace view among Treatment, Screenplay, Shot List, and Storyboards."""
         try:
             ws = self.query_one("#main-workspace", StudioWorkspace)
             sp = self.query_one("#screenplay-workspace", ScreenplayWorkspace)
             sl = self.query_one("#shotlist-workspace", ShotListWorkspace)
-            if active_view == "shotlist":
-                ws.display = False
-                sp.display = False
-                sl.display = True
-            elif active_view == "screenplay":
-                ws.display = False
-                sp.display = True
-                sl.display = False
-            else:
-                ws.display = True
-                sp.display = False
-                sl.display = False
+            sb = self.query_one("#storyboard-workspace", StoryboardsWorkspace)
+            nav = self.query_one("#nav-sidebar", NavigationSidebar)
+
+            ws.display = (active_view == "treatment")
+            sp.display = (active_view == "screenplay")
+            sl.display = (active_view == "shotlist")
+            sb.display = (active_view == "storyboards")
+
+            nav.active_view = active_view
         except Exception:
             pass
 
@@ -220,20 +281,51 @@ class StudioApp(App):
             pass
 
     def watch_is_generating_shotlist(self, is_gen: bool) -> None:
-        """Push is_generating_shotlist state down to ScreenplayWorkspace."""
+        """Push is_generating_shotlist state down to ScreenplayWorkspace and ShotListWorkspace."""
         try:
             sp = self.query_one("#screenplay-workspace", ScreenplayWorkspace)
             sp.is_generating_shotlist = is_gen
         except Exception:
             pass
+        try:
+            sl = self.query_one("#shotlist-workspace", ShotListWorkspace)
+            sl.is_generating = is_gen
+        except Exception:
+            pass
 
+    def watch_current_storyboards_data(self, data: List[str]) -> None:
+        """Push current_storyboards_data down to StoryboardsWorkspace."""
+        try:
+            sb = self.query_one("#storyboard-workspace", StoryboardsWorkspace)
+            sb.storyboards_data = data
+        except Exception:
+            pass
+
+    def watch_is_generating_storyboards(self, is_gen: bool) -> None:
+        """Push is_generating_storyboards state down to ShotListWorkspace and StoryboardsWorkspace."""
+        try:
+            sl = self.query_one("#shotlist-workspace", ShotListWorkspace)
+            sl.is_generating_storyboards = is_gen
+        except Exception:
+            pass
+        try:
+            sb = self.query_one("#storyboard-workspace", StoryboardsWorkspace)
+            sb.is_generating = is_gen
+        except Exception:
+            pass
 
     def watch_app_profile(self, profile: Optional[TeamProfile]) -> None:
         """Push app_profile state changes down to child widgets."""
         try:
-            self.query_one(NavigationSidebar).profile = profile
             self.query_one(HeaderHUD).profile = profile
+        except Exception:
+            pass
+        try:
             self.query_one(StudioWorkspace).profile = profile
+        except Exception:
+            pass
+        try:
+            self.query_one(NavigationSidebar).profile = profile
         except Exception:
             pass
 
@@ -241,7 +333,14 @@ class StudioApp(App):
         """Push app_draw state changes down to child widgets."""
         try:
             self.query_one(StudioWorkspace).draw = draw
+        except Exception:
+            pass
+        try:
             self.query_one(HeaderHUD).draw = draw
+        except Exception:
+            pass
+        try:
+            self.query_one(NavigationSidebar).draw = draw
         except Exception:
             pass
 
@@ -274,12 +373,20 @@ class StudioApp(App):
             pass
 
     def action_switch_to_treatment_view(self) -> None:
-        """Switch active workspace view back to Treatment view."""
+        """Switch active workspace view to Treatment view."""
         self.active_view = "treatment"
 
     def action_switch_to_screenplay_view(self) -> None:
         """Switch active workspace view to Screenplay view."""
         self.active_view = "screenplay"
+
+    def action_switch_to_shotlist_view(self) -> None:
+        """Switch active workspace view to Shot List view."""
+        self.active_view = "shotlist"
+
+    def action_switch_to_storyboard_view(self) -> None:
+        """Switch active workspace view to Storyboards view."""
+        self.active_view = "storyboards"
 
     def action_open_draw_wizard(self) -> None:
         """Push the DrawWizardScreen modal."""
@@ -314,19 +421,6 @@ class StudioApp(App):
             self.active_view = "shotlist"
             self.notify(f"Loaded shot list draft from {file_path}", title="Shot List Loaded", severity="information")
 
-    def action_switch_to_treatment_view(self) -> None:
-        """Switch active view to Treatment workspace."""
-        self.active_view = "treatment"
-
-    def action_switch_to_screenplay_view(self) -> None:
-        """Switch active view to Screenplay workspace."""
-        self.active_view = "screenplay"
-
-    def action_switch_to_shotlist_view(self) -> None:
-        """Switch active view to ShotList workspace."""
-        self.active_view = "shotlist"
-
-
     def action_open_profile_setup(self) -> None:
         """Push the ProfileSetupScreen modal."""
         self.push_screen(ProfileSetupScreen(self.app_profile), callback=self.update_profile)
@@ -350,7 +444,6 @@ class StudioApp(App):
         extra_directives = None
         try:
             from textual.widgets import TextArea
-            from studio.workspace import RecipePane
             recipe_pane = self.query_one(RecipePane)
             ta = recipe_pane.query_one("#additional_instructions", TextArea)
             extra_directives = ta.text
@@ -358,204 +451,227 @@ class StudioApp(App):
             pass
 
         try:
+            draw_data = self.app_draw or load_draw()
+            profile_data = self.app_profile or load_profile()
+
             prompt = PromptBuilder.compile_system_prompt(
-                draw=self.app_draw,
-                profile=self.app_profile,
+                draw=draw_data,
+                profile=profile_data,
                 additional_instructions=extra_directives,
             )
-            treatment = InferenceEngine.generate_treatment(prompt=prompt)
-            saved_path = save_treatment_output(treatment, prompt_text=prompt)
-            md_content = convert_treatment_to_markdown(treatment, prompt_text=prompt)
-            header = f"> 💾 **Saved to:** `{saved_path}`\n\n"
-            final_md = header + md_content
-            self.call_from_thread(self._on_treatment_success, final_md, str(saved_path), treatment, prompt)
+
+            treatment_obj = InferenceEngine.generate_treatment(prompt)
+            markdown_content = convert_treatment_to_markdown(treatment_obj, prompt_text=prompt)
+
+            saved_path = save_treatment_output(treatment_obj, prompt_text=prompt)
+
+            self.call_from_thread(
+                self._on_treatment_success,
+                treatment_obj,
+                markdown_content,
+                prompt,
+                str(saved_path),
+            )
+
         except InferenceError as err:
             err_msg = str(err)
-            error_md = (
-                f"# ❌ Generation Failed\n\n"
-                f"> **Inference Error:**\n```\n{err_msg}\n```\n\n"
-                f"Please verify your `GEMINI_API_KEY` environment variable or try again."
-            )
-            self.call_from_thread(self._on_treatment_error, error_md, err_msg)
+            self.call_from_thread(self._on_treatment_error, err_msg)
         except Exception as err:
             err_msg = str(err)
-            error_md = (
-                f"# ❌ Unexpected Error\n\n"
-                f"> **Error:**\n```\n{err_msg}\n```"
-            )
-            self.call_from_thread(self._on_treatment_error, error_md, err_msg)
+            self.call_from_thread(self._on_treatment_error, err_msg)
+
+    def _set_generating_state(self, state: bool) -> None:
+        self.is_generating = state
+
+    def _on_treatment_success(
+        self,
+        treatment_obj: TreatmentOutput,
+        markdown_content: str,
+        prompt: str,
+        saved_path_str: str,
+    ) -> None:
+        self.is_generating = False
+        self.current_treatment_obj = treatment_obj
+        self.current_markdown = f"{markdown_content}\n\n---\n*Saved to `{saved_path_str}`*"
+        self.current_prompt_text = prompt
+        self.notify(
+            f"Saved treatment to {saved_path_str}",
+            title="Treatment Saved",
+            severity="information",
+        )
+
+    def _on_treatment_error(self, err_msg: str) -> None:
+        self.is_generating = False
+        self.current_markdown = (
+            f"# ❌ Generation Failed\n\n"
+            f"**Error Details:**\n```\n{err_msg}\n```\n\n"
+            f"Please check your API key under `Settings [S]` and verify that your constraints and Friday draw are valid."
+        )
+        self.notify(
+            f"Treatment generation failed: {err_msg}",
+            title="Generation Error",
+            severity="error",
+        )
 
     @work(thread=True)
     def action_revise_treatment(self) -> None:
-        """Revise current treatment with user notes in background worker thread."""
+        """Revise the active treatment based on director feedback instructions."""
+        from textual.widgets import TextArea
+        from studio.workspace import RevisionPane
+
         if not self.current_treatment_obj:
-            self.notify("No active treatment to revise.", title="Revision Error", severity="error")
+            self.notify(
+                "No active treatment to revise. Generate a treatment first.",
+                title="Revision Warning",
+                severity="warning",
+            )
             return
 
-        notes = ""
+        revision_notes = ""
         try:
-            from textual.widgets import TextArea
-            from studio.workspace import RevisionPane
             rev_pane = self.query_one(RevisionPane)
-            notes_ta = rev_pane.query_one("#revision_notes_input", TextArea)
-            notes = notes_ta.text
+            ta = rev_pane.query_one("#revision_notes_input", TextArea)
+            revision_notes = ta.text
         except Exception:
             pass
 
-        if not notes or not notes.strip():
-            self.notify("Please enter revision notes before submitting.", title="Revision Note Required", severity="warning")
+        if not revision_notes.strip():
+            self.notify(
+                "Please enter revision instructions before submitting.",
+                title="Instructions Required",
+                severity="warning",
+            )
             return
 
         self.call_from_thread(self._set_revising_state, True)
 
         try:
-            revised_prompt = PromptBuilder.compile_revision_prompt(
+            profile_data = self.app_profile or load_profile()
+            draw_data = self.app_draw or load_draw()
+            compiled_prompt = PromptBuilder.compile_revision_prompt(
                 current_treatment=self.current_treatment_obj,
-                notes=notes,
+                notes=revision_notes,
                 original_prompt=self.current_prompt_text,
-                draw=self.app_draw,
-                profile=self.app_profile,
+                draw=draw_data,
+                profile=profile_data,
             )
-            revised_treatment = InferenceEngine.generate_treatment(prompt=revised_prompt)
-            saved_path = save_treatment_output(revised_treatment, prompt_text=revised_prompt)
-            md_content = convert_treatment_to_markdown(revised_treatment, prompt_text=revised_prompt)
-            header = f"> 💾 **Saved to:** `{saved_path}`\n\n"
-            final_md = header + md_content
+
+            revised_treatment = InferenceEngine.generate_treatment(compiled_prompt)
+            markdown_content = convert_treatment_to_markdown(revised_treatment, prompt_text=compiled_prompt)
+            saved_path = save_treatment_output(revised_treatment, prompt_text=compiled_prompt)
+
             self.call_from_thread(
                 self._on_revision_success,
-                final_md,
-                str(saved_path),
                 revised_treatment,
-                revised_prompt,
-            )
-        except InferenceError as err:
-            err_msg = str(err)
-            self.call_from_thread(self._on_revision_error, err_msg)
-        except Exception as err:
-            err_msg = str(err)
-            self.call_from_thread(self._on_revision_error, err_msg)
-
-    @work(thread=True)
-    def action_generate_screenplay(self) -> None:
-        """Compile screenplay prompt and generate Fountain script in background worker thread."""
-        if not self.current_treatment_obj:
-            self.notify(
-                "Please generate or load a film treatment before generating a screenplay.",
-                title="Treatment Required",
-                severity="warning",
-            )
-            return
-
-        self.call_from_thread(self._set_screenplay_generating_state, True)
-        self.call_from_thread(self.action_switch_to_screenplay_view)
-
-        extra_directives = None
-        try:
-            from textual.widgets import TextArea
-            from studio.workspace import RecipePane
-            recipe_pane = self.query_one(RecipePane)
-            ta = recipe_pane.query_one("#additional_instructions", TextArea)
-            extra_directives = ta.text
-        except Exception:
-            pass
-
-        try:
-            prompt = PromptBuilder.compile_screenplay_prompt(
-                treatment=self.current_treatment_obj,
-                draw=self.app_draw,
-                profile=self.app_profile,
-                additional_instructions=extra_directives,
-            )
-            raw_screenplay = InferenceEngine.generate_screenplay(prompt=prompt)
-            title = self.current_treatment_obj.title_and_logline.title
-            saved_path = save_screenplay_output(raw_screenplay, title=title)
-            self.call_from_thread(
-                self._on_screenplay_success,
-                raw_screenplay,
+                markdown_content,
+                compiled_prompt,
                 str(saved_path),
             )
+
         except InferenceError as err:
             err_msg = str(err)
-            self.call_from_thread(self._on_screenplay_error, err_msg)
+            self.call_from_thread(self._on_revision_error, err_msg)
         except Exception as err:
             err_msg = str(err)
-            self.call_from_thread(self._on_screenplay_error, err_msg)
-
-    def _set_generating_state(self, state: bool) -> None:
-        self.is_generating = state
+            self.call_from_thread(self._on_revision_error, err_msg)
 
     def _set_revising_state(self, state: bool) -> None:
         self.is_revising = state
 
-    def _set_screenplay_generating_state(self, state: bool) -> None:
-        self.is_generating_screenplay = state
-
-    def _on_treatment_success(
-        self,
-        md_content: str,
-        saved_path: str,
-        treatment: TreatmentOutput,
-        prompt: str,
-    ) -> None:
-        self.current_treatment_obj = treatment
-        self.current_prompt_text = prompt
-        self.current_markdown = md_content
-        self.is_generating = False
-        self.notify(
-            f"Treatment saved to {saved_path}",
-            title="Treatment Generated",
-            severity="information",
-        )
-
-    def _on_treatment_error(self, error_md: str, err_msg: str) -> None:
-        self.current_markdown = error_md
-        self.is_generating = False
-        self.notify(
-            f"Generation failed: {err_msg}",
-            title="Generation Error",
-            severity="error",
-        )
-
     def _on_revision_success(
         self,
-        md_content: str,
-        saved_path: str,
-        treatment: TreatmentOutput,
+        revised_treatment: TreatmentOutput,
+        markdown_content: str,
         prompt: str,
+        saved_path_str: str,
     ) -> None:
-        self.current_treatment_obj = treatment
-        self.current_prompt_text = prompt
-        self.current_markdown = md_content
         self.is_revising = False
+        self.current_treatment_obj = revised_treatment
+        self.current_markdown = f"{markdown_content}\n\n---\n*Saved to `{saved_path_str}`*"
+        self.current_prompt_text = prompt
+
         try:
             from textual.widgets import TextArea
             from studio.workspace import RevisionPane
             rev_pane = self.query_one(RevisionPane)
-            notes_ta = rev_pane.query_one("#revision_notes_input", TextArea)
-            notes_ta.text = ""
+            ta = rev_pane.query_one("#revision_notes_input", TextArea)
+            ta.text = ""
         except Exception:
             pass
 
         self.notify(
-            f"Revised treatment saved to {saved_path}",
+            f"Saved revised treatment to {saved_path_str}",
             title="Treatment Revised",
             severity="information",
         )
 
     def _on_revision_error(self, err_msg: str) -> None:
         self.is_revising = False
+        self.current_markdown = (
+            f"# ❌ Revision Failed\n\n"
+            f"**Error Details:**\n```\n{err_msg}\n```"
+        )
         self.notify(
-            f"Revision failed: {err_msg}",
+            f"Treatment revision failed: {err_msg}",
             title="Revision Error",
             severity="error",
         )
 
-    def _on_screenplay_success(self, screenplay_text: str, saved_path: str) -> None:
-        self.current_screenplay_text = screenplay_text
+    @work(thread=True)
+    def action_generate_screenplay(self) -> None:
+        """Compile screenplay prompt and generate full script in background worker thread."""
+        if not self.current_treatment_obj:
+            self.notify(
+                "Please generate or load a treatment before generating a screenplay.",
+                title="Treatment Required",
+                severity="warning",
+            )
+            return
+
+        self.call_from_thread(self._set_screenplay_generating_state, True)
+
+        try:
+            prompt = PromptBuilder.compile_screenplay_prompt(
+                treatment=self.current_treatment_obj,
+                draw=self.app_draw,
+                profile=self.app_profile,
+            )
+
+            raw_fountain = InferenceEngine.generate_screenplay(prompt)
+            title = "Untitled"
+            if self.current_treatment_obj and self.current_treatment_obj.title_and_logline:
+                title = self.current_treatment_obj.title_and_logline.title
+
+            saved_path = save_screenplay_output(raw_fountain, title=title)
+
+            self.call_from_thread(
+                self._on_screenplay_success,
+                raw_fountain,
+                str(saved_path),
+            )
+
+        except InferenceError as err:
+            err_msg = str(err)
+            self.call_from_thread(self._on_screenplay_error, err_msg)
+        except Exception as err:
+            err_msg = str(err)
+            self.call_from_thread(self._on_screenplay_error, err_msg)
+
+    def _set_screenplay_generating_state(self, state: bool) -> None:
+        self.is_generating_screenplay = state
+        self.active_view = "screenplay"
+
+    def _on_screenplay_success(
+        self,
+        fountain_text: str,
+        saved_path_str: str,
+    ) -> None:
         self.is_generating_screenplay = False
+        self.current_screenplay_text = fountain_text
+        self.active_view = "screenplay"
         self.notify(
-            f"Screenplay saved to {saved_path}",
-            title="Screenplay Generated",
+            f"Saved screenplay to {saved_path_str}",
+            title="Screenplay Saved",
             severity="information",
         )
 
@@ -569,8 +685,8 @@ class StudioApp(App):
 
     @work(thread=True)
     def action_generate_shotlist(self) -> None:
-        """Compile shotlist prompt and generate StudioBinder shot list in background worker thread."""
-        if not self.current_screenplay_text or not self.current_screenplay_text.strip():
+        """Extract shot list items from active screenplay in background worker thread."""
+        if not self.current_screenplay_text:
             self.notify(
                 "Please generate or load a screenplay before generating a shot list.",
                 title="Screenplay Required",
@@ -586,16 +702,20 @@ class StudioApp(App):
                 profile=self.app_profile,
                 draw=self.app_draw,
             )
-            shotlist_obj = InferenceEngine.generate_shotlist(prompt=prompt)
+
+            shotlist_obj = InferenceEngine.generate_shotlist(prompt)
             title = "Untitled"
             if self.current_treatment_obj and self.current_treatment_obj.title_and_logline:
                 title = self.current_treatment_obj.title_and_logline.title
+
             saved_path = save_shotlist_csv(shotlist_obj, title=title)
+
             self.call_from_thread(
                 self._on_shotlist_success,
                 shotlist_obj,
                 str(saved_path),
             )
+
         except InferenceError as err:
             err_msg = str(err)
             self.call_from_thread(self._on_shotlist_error, err_msg)
@@ -605,14 +725,19 @@ class StudioApp(App):
 
     def _set_shotlist_generating_state(self, state: bool) -> None:
         self.is_generating_shotlist = state
+        self.active_view = "shotlist"
 
-    def _on_shotlist_success(self, shotlist_obj: Any, saved_path: str) -> None:
-        self.current_shotlist_data = shotlist_obj
+    def _on_shotlist_success(
+        self,
+        shotlist_obj: ShotListBase,
+        saved_path_str: str,
+    ) -> None:
         self.is_generating_shotlist = False
+        self.current_shotlist_data = shotlist_obj
         self.active_view = "shotlist"
         self.notify(
-            f"Shot list saved to {saved_path}",
-            title="Shot List Generated",
+            f"Saved shot list to {saved_path_str}",
+            title="Shot List Saved",
             severity="information",
         )
 
@@ -677,6 +802,10 @@ class StudioApp(App):
                 from studio.utils.constraint_store import load_directorial_vision
                 directorial_vision = load_directorial_vision(self.app_profile.active_directorial_vision)
 
+            title = "Untitled"
+            if self.current_treatment_obj and self.current_treatment_obj.title_and_logline:
+                title = self.current_treatment_obj.title_and_logline.title
+
             for shot in shots:
                 prompt = PromptBuilder.compile_storyboard_prompt(shot, directorial_vision)
                 image_bytes = InferenceEngine.generate_storyboard_image(prompt)
@@ -684,6 +813,7 @@ class StudioApp(App):
                     image_bytes=image_bytes,
                     shot_number=shot.shot_number,
                     scene_number=str(shot.scene_number),
+                    title=title,
                 )
                 saved_paths.append(str(saved_path))
 
@@ -698,9 +828,12 @@ class StudioApp(App):
 
     def _set_storyboard_generating_state(self, state: bool) -> None:
         self.is_generating_storyboards = state
+        self.active_view = "storyboards"
 
     def _on_storyboard_success(self, saved_paths: List[str]) -> None:
         self.is_generating_storyboards = False
+        self.current_storyboards_data = saved_paths
+        self.active_view = "storyboards"
         sb_dir = Path(saved_paths[0]).parent if saved_paths else "storyboards/"
         self.notify(
             f"Generated {len(saved_paths)} storyboard images in {sb_dir}",
@@ -720,11 +853,29 @@ class StudioApp(App):
         """Callback invoked when DrawWizardScreen is dismissed."""
         if new_draw is not None:
             self.app_draw = load_draw() or new_draw
+        try:
+            self.query_one(NavigationSidebar).draw = self.app_draw
+            self.query_one(StudioWorkspace).draw = self.app_draw
+            self.query_one(RecipePane).draw = self.app_draw
+            self.query_one(RecipePane).update_content()
+            self.query_one(HeaderHUD).draw = self.app_draw
+            self.query_one(HeaderHUD).update_content()
+        except Exception:
+            pass
 
     def update_profile(self, new_profile: Optional[TeamProfile]) -> None:
         """Callback invoked when ProfileSetupScreen or ConstraintLibraryScreen is dismissed."""
         if new_profile is not None:
             self.app_profile = load_profile() or new_profile
+        try:
+            self.query_one(NavigationSidebar).profile = self.app_profile
+            self.query_one(StudioWorkspace).profile = self.app_profile
+            self.query_one(RecipePane).profile = self.app_profile
+            self.query_one(RecipePane).update_content()
+            self.query_one(HeaderHUD).profile = self.app_profile
+            self.query_one(HeaderHUD).update_content()
+        except Exception:
+            pass
 
     def update_workspace(self, new_workspace: Optional[Path]) -> None:
         """Callback invoked when WorkspaceManagerScreen is dismissed."""
@@ -732,13 +883,30 @@ class StudioApp(App):
             self.app_profile = load_profile()
             self.app_draw = load_draw()
             try:
+                self.query_one(NavigationSidebar).profile = self.app_profile
+                self.query_one(NavigationSidebar).draw = self.app_draw
+                self.query_one(StudioWorkspace).profile = self.app_profile
+                self.query_one(StudioWorkspace).draw = self.app_draw
+                self.query_one(RecipePane).profile = self.app_profile
+                self.query_one(RecipePane).draw = self.app_draw
+                self.query_one(RecipePane).update_content()
+                self.query_one(HeaderHUD).profile = self.app_profile
+                self.query_one(HeaderHUD).draw = self.app_draw
                 self.query_one(HeaderHUD).update_content()
             except Exception:
                 pass
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle button presses from sidebar or workspace."""
-        if event.button.id == "btn_profile_modal":
+        if event.button.id == "btn_nav_treatment":
+            self.action_switch_to_treatment_view()
+        elif event.button.id == "btn_nav_screenplay":
+            self.action_switch_to_screenplay_view()
+        elif event.button.id == "btn_nav_shotlist":
+            self.action_switch_to_shotlist_view()
+        elif event.button.id == "btn_nav_storyboards":
+            self.action_switch_to_storyboard_view()
+        elif event.button.id == "btn_profile_modal":
             self.action_open_profile_setup()
         elif event.button.id == "btn_workspace_modal":
             self.action_open_workspace_manager()
@@ -756,13 +924,20 @@ class StudioApp(App):
             self.action_generate_treatment()
         elif event.button.id == "btn_submit_revision":
             self.action_revise_treatment()
-        elif event.button.id == "btn_generate_screenplay":
+        elif event.button.id in ("btn_generate_screenplay", "btn_empty_generate_screenplay"):
             self.action_generate_screenplay()
-        elif event.button.id == "btn_generate_shotlist":
+        elif event.button.id in ("btn_generate_shotlist", "btn_empty_generate_shotlist"):
             self.action_generate_shotlist()
+        elif event.button.id in ("btn_generate_storyboards", "btn_empty_generate_storyboards", "btn_regen_storyboards"):
+            self.action_generate_storyboards()
+        elif event.button.id == "btn_back_to_treatment":
+            self.action_switch_to_treatment_view()
+        elif event.button.id == "btn_back_to_screenplay":
+            self.action_switch_to_screenplay_view()
+        elif event.button.id == "btn_back_to_shotlist":
+            self.action_switch_to_shotlist_view()
 
 
 if __name__ == "__main__":
     app = StudioApp()
     app.run()
-

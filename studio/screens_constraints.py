@@ -546,6 +546,14 @@ class IdeaSeedScreen(ModalScreen[Optional[IdeaSeed]]):
                     id="ending_targets",
                 )
 
+                yield Label("Max Recommended Actors (Optional):", classes="field-label")
+                yield Input(
+                    value=str(c.max_actors) if c and c.max_actors is not None else "",
+                    placeholder="e.g. 2, 3 (leave blank for flexible/unlimited)",
+                    id="max_actors",
+                    classes="form-field",
+                )
+
             with Horizontal(id="button-bar"):
                 yield Button(
                     "Save Idea Seed",
@@ -571,14 +579,19 @@ class IdeaSeedScreen(ModalScreen[Optional[IdeaSeed]]):
         comp = self.query_one("#complications", TextArea).text
         end_t = self.query_one("#ending_targets", TextArea).text
 
+        max_act_raw = self.query_one("#max_actors", Input).value.strip()
+        max_act_val = int(max_act_raw) if max_act_raw.isdigit() and int(max_act_raw) > 0 else None
+
         constraint = IdeaSeed(
             name=name_val,
             description=desc_val,
             inciting_incident=inc_inc,
             complications=comp,
             ending_targets=end_t,
+            max_actors=max_act_val,
         )
 
         save_idea_seed(constraint)
         self.dismiss(constraint)
+
 

@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.scripts]
-48hfp = "main:app"
+48hfp = "studio.cli:app"
 
 [tool.setuptools.packages.find]
 include = ["studio*"]

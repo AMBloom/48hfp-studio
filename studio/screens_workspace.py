@@ -1,18 +1,18 @@
-"""Modal screen for native TUI Workspace Manager with directory browser."""
+"""Modal screen for native TUI Workspace Manager with streamlined path input."""
 
 from pathlib import Path
 from typing import Optional
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal
 from textual.screen import ModalScreen
-from textual.widgets import Button, DirectoryTree, Input, Label
+from textual.widgets import Button, Input, Label
 
 from studio.utils.constraint_store import seed_default_constraints
 from studio.utils.global_state import get_active_workspace, set_active_workspace
 
 
 class WorkspaceManagerScreen(ModalScreen[Optional[Path]]):
-    """Interactive Modal Screen for selecting, browsing, and initializing project workspaces."""
+    """Interactive Modal Screen for selecting, entering, and initializing project workspaces."""
 
     DEFAULT_CSS = """
     WorkspaceManagerScreen {
@@ -22,10 +22,9 @@ class WorkspaceManagerScreen(ModalScreen[Optional[Path]]):
 
     #workspace-dialog {
         padding: 1 2;
-        width: 85%;
-        max-width: 80;
+        width: 80%;
+        max-width: 70;
         height: auto;
-        max-height: 90%;
         background: $surface;
         border: thick $accent;
     }
@@ -43,18 +42,8 @@ class WorkspaceManagerScreen(ModalScreen[Optional[Path]]):
         margin-bottom: 0;
     }
 
-    #tree-container {
-        height: 12;
-        border: solid $accent-darken-2;
-        margin-bottom: 1;
-    }
-
-    #dir_tree {
-        width: 100%;
-        height: 100%;
-    }
-
     #workspace_path_input {
+        margin-top: 1;
         margin-bottom: 1;
     }
 
@@ -81,28 +70,16 @@ class WorkspaceManagerScreen(ModalScreen[Optional[Path]]):
             yield Label("📂 [bold cyan]WORKSPACE MANAGER[/bold cyan]", classes="title")
             yield Label(f"Current Active Workspace: [bold yellow]{active_str}[/bold yellow]\n", classes="field-label")
 
-            yield Label("📁 Browse Working Directory Folders:", classes="field-label")
-            with Container(id="tree-container"):
-                yield DirectoryTree(Path.cwd(), id="dir_tree")
-
-            yield Label("Selected / Custom Workspace Directory Path:", classes="field-label")
+            yield Label("Target Workspace Directory Path:", classes="field-label")
             yield Input(
                 value=str(active_ws or Path.cwd()),
-                placeholder="Enter or select folder path...",
+                placeholder="Enter workspace folder path...",
                 id="workspace_path_input",
             )
 
             with Horizontal(id="button-bar"):
                 yield Button("Set / Init Workspace", variant="primary", id="btn_set_workspace")
                 yield Button("Cancel", variant="default", id="btn_cancel_workspace")
-
-    def on_directory_tree_directory_selected(self, event: DirectoryTree.DirectorySelected) -> None:
-        """Update the input path when a directory is clicked/selected in the DirectoryTree."""
-        self.query_one("#workspace_path_input", Input).value = str(event.path)
-
-    def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
-        """Update the input path to parent directory when a file is selected in the DirectoryTree."""
-        self.query_one("#workspace_path_input", Input).value = str(event.path.parent)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Submit the workspace path when Enter is pressed in the Input field."""
@@ -139,3 +116,4 @@ class WorkspaceManagerScreen(ModalScreen[Optional[Path]]):
 
         self.notify(f"Active workspace set to: {target_path}", title="Workspace Updated", severity="information")
         self.dismiss(target_path)
+

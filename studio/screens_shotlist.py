@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List, Union
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Container, Horizontal, Vertical
 from textual.reactive import reactive
 from textual.widgets import Button, DataTable, Label, Static
 
@@ -14,6 +14,7 @@ class ShotListWorkspace(Static):
 
     shotlist_data: reactive[Union[ShotListBase, List[Dict[str, Any]], List[ShotItem], None]] = reactive(None)
     is_generating_storyboards: reactive[bool] = reactive(False)
+    is_generating: reactive[bool] = reactive(False)
 
     DEFAULT_CSS = """
     ShotListWorkspace {
@@ -44,6 +45,33 @@ class ShotListWorkspace(Static):
         content-align: center middle;
     }
 
+    #shotlist-empty-container {
+        width: 100%;
+        height: 1fr;
+        align: center middle;
+        padding: 4;
+        background: $surface-darken-1;
+        border: heavy $accent;
+    }
+
+    #shotlist-empty-title {
+        text-style: bold;
+        color: $accent;
+        margin-bottom: 1;
+        content-align: center middle;
+    }
+
+    #shotlist-empty-desc {
+        color: $text-muted;
+        margin-bottom: 2;
+        content-align: center middle;
+        text-align: center;
+    }
+
+    #btn_empty_generate_shotlist {
+        min-width: 44;
+    }
+
     #table-container {
         width: 100%;
         height: 1fr;
@@ -61,9 +89,21 @@ class ShotListWorkspace(Static):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="shotlist-toolbar"):
-            yield Button("← Back to Screenplay", id="btn_back_to_screenplay", variant="default")
+            yield Button("← Back to Screenplay [2]", id="btn_back_to_screenplay", variant="default")
             yield Label("🎥 StudioBinder Shot List", id="shotlist-title")
             yield Button("🖼️ Generate Storyboards", id="btn_generate_storyboards", variant="primary")
+
+        with Vertical(id="shotlist-empty-container"):
+            yield Label("🎥 [bold cyan]No Shot List Available[/bold cyan]", id="shotlist-empty-title")
+            yield Label(
+                "Extract production scenes and generate a StudioBinder-style shot list from your active screenplay.",
+                id="shotlist-empty-desc",
+            )
+            yield Button(
+                "🎥 Generate Shot List from Active Screenplay",
+                id="btn_empty_generate_shotlist",
+                variant="success",
+            )
 
         with Vertical(id="table-container"):
             yield DataTable(id="table-shotlist")
@@ -73,6 +113,18 @@ class ShotListWorkspace(Static):
             btn = self.query_one("#btn_generate_storyboards", Button)
             btn.disabled = is_gen
             btn.label = "⏳ Generating..." if is_gen else "🖼️ Generate Storyboards"
+        except Exception:
+            pass
+
+    def watch_is_generating(self, is_gen: bool) -> None:
+        try:
+            btn_empty = self.query_one("#btn_empty_generate_shotlist", Button)
+            if is_gen:
+                btn_empty.label = "⏳ Generating Shot List..."
+                btn_empty.disabled = True
+            else:
+                btn_empty.label = "🎥 Generate Shot List from Active Screenplay"
+                btn_empty.disabled = False
         except Exception:
             pass
 
@@ -90,10 +142,28 @@ class ShotListWorkspace(Static):
             "Cast",
             "Description",
         )
+        self.apply_view_state()
         self.update_table()
 
     def watch_shotlist_data(self, new_data: Any) -> None:
+        self.apply_view_state()
         self.update_table()
+
+    def apply_view_state(self) -> None:
+        try:
+            empty_box = self.query_one("#shotlist-empty-container", Vertical)
+            tbl_box = self.query_one("#table-container", Vertical)
+            toolbar = self.query_one("#shotlist-toolbar", Horizontal)
+
+            toolbar.display = True
+            if not self.shotlist_data:
+                empty_box.display = True
+                tbl_box.display = False
+            else:
+                empty_box.display = False
+                tbl_box.display = True
+        except Exception:
+            pass
 
     def update_table(self) -> None:
         try:
@@ -170,4 +240,6 @@ class ShotListWorkspace(Static):
         elif event.button.id == "btn_generate_storyboards":
             if hasattr(self.app, "action_generate_storyboards"):
                 self.app.action_generate_storyboards()
-
+        elif event.button.id == "btn_empty_generate_shotlist":
+            if hasattr(self.app, "action_generate_shotlist"):
+                self.app.action_generate_shotlist()

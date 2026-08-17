@@ -24,6 +24,7 @@ from studio.models.treatment import (
     SceneBreakdownItem,
     TitleAndLogline,
     TreatmentOutput,
+    VisualProfile,
 )
 
 __all__ = [
@@ -40,6 +41,7 @@ __all__ = [
     "create_default_draw",
     "TitleAndLogline",
     "CharacterRosterItem",
+    "VisualProfile",
     "NarrativeSynopsis",
     "SceneBreakdownItem",
     "DialogueSnippetItem",
@@ -48,4 +50,5 @@ __all__ = [
     "ShotItem",
     "ShotListBase",
 ]
+
 

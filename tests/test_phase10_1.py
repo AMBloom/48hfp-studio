@@ -236,12 +236,12 @@ async def test_action_generate_screenplay_flow(tmp_path: Path, dummy_treatment) 
             assert app.active_view == "screenplay"
             assert app.current_screenplay_text == SAMPLE_FOUNTAIN_SCRIPT
 
-            # Verify saved .fountain file in screenplays/
-            sp_dir = ws_dir / "screenplays"
+            # Verify saved .fountain file in projects/The_Clockmaker/
+            sp_dir = ws_dir / "projects" / "The_Clockmaker"
             assert sp_dir.exists()
             fountain_files = list(sp_dir.glob("script_v*.fountain"))
             assert len(fountain_files) == 1
-            assert "script_v01_The_Clockmaker_" in fountain_files[0].name
+            assert fountain_files[0].name == "script_v01.fountain"
             assert "INT. CLOCK SHOP - NIGHT" in fountain_files[0].read_text(encoding="utf-8")
 
 

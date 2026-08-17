@@ -333,6 +333,158 @@ class DrawWizardScreen(ModalScreen[Optional[FridayDraw]]):
         self.dismiss(draw)
 
 
+class CastMemberScreen(ModalScreen[Optional[Dict[str, str]]]):
+    """Interactive Modal Screen for creating or editing a single Cast Member profile."""
+
+    DEFAULT_CSS = """
+    CastMemberScreen {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    #cast-member-dialog {
+        padding: 1 2;
+        width: 80%;
+        max-width: 70;
+        height: auto;
+        max-height: 90%;
+        background: $surface;
+        border: thick $accent;
+    }
+
+    .form-field {
+        margin-bottom: 1;
+    }
+
+    .field-label {
+        color: $text;
+        text-style: bold;
+        margin-top: 1;
+        margin-bottom: 0;
+    }
+
+    #cast-button-bar {
+        margin-top: 1;
+        height: 3;
+        align: right middle;
+    }
+
+    #cast-button-bar Button {
+        margin-left: 2;
+    }
+    """
+
+    BINDINGS = [
+        ("escape", "cancel", "Cancel"),
+    ]
+
+    def __init__(self, initial_data: Optional[Dict[str, str]] = None) -> None:
+        super().__init__()
+        self.initial_data = initial_data or {}
+
+    def compose(self) -> ComposeResult:
+        init = self.initial_data
+        with Container(id="cast-member-dialog"):
+            yield Label("🎭 [bold cyan]ADD / EDIT CAST MEMBER[/bold cyan]\n", classes="title")
+            with VerticalScroll():
+                yield Label("Actor / Character Name:", classes="field-label")
+                yield Input(
+                    value=init.get("name", ""),
+                    placeholder="e.g. Maya Lin / Alex Mercer",
+                    id="member_name",
+                    classes="form-field",
+                )
+
+                yield Label("Age Range:", classes="field-label")
+                yield Input(
+                    value=init.get("age_range", "") if init.get("age_range") != "Unspecified" else "",
+                    placeholder="e.g. 20s-30s, 40s, Teen",
+                    id="member_age",
+                    classes="form-field",
+                )
+
+                yield Label("Gender / Pronouns:", classes="field-label")
+                yield Input(
+                    value=init.get("gender", "") if init.get("gender") != "Unspecified" else "",
+                    placeholder="e.g. Female, Male, Non-Binary",
+                    id="member_gender",
+                    classes="form-field",
+                )
+
+                yield Label("Ethnicity / Complexion:", classes="field-label")
+                yield Input(
+                    value=init.get("ethnicity", "") if init.get("ethnicity") != "Unspecified" else "",
+                    placeholder="e.g. East Asian, Hispanic/Latino, Black, Caucasian",
+                    id="member_ethnicity",
+                    classes="form-field",
+                )
+
+                yield Label("Hair Color & Style:", classes="field-label")
+                yield Input(
+                    value=init.get("hair", "") if init.get("hair") != "Unspecified" else "",
+                    placeholder="e.g. Jet black sharp bob, Wavy auburn, Buzz cut",
+                    id="member_hair",
+                    classes="form-field",
+                )
+
+                yield Label("Build / Silhouette:", classes="field-label")
+                yield Input(
+                    value=init.get("build", "") if init.get("build") != "Unspecified" else "",
+                    placeholder="e.g. Athletic / Tall, Slender, Stocky",
+                    id="member_build",
+                    classes="form-field",
+                )
+
+                yield Label("Signature Visual Anchor (Distinctive Prop / Wardrobe):", classes="field-label")
+                yield Input(
+                    value=init.get("visual_anchor", "") if init.get("visual_anchor") != "None" else "",
+                    placeholder="e.g. Scarlet red beret, Round wireframe glasses, Denim vest",
+                    id="member_anchor",
+                    classes="form-field",
+                )
+
+            with Horizontal(id="cast-button-bar"):
+                yield Button("Save Cast Member", variant="primary", id="save_cast_member_btn")
+                yield Button("Cancel", variant="default", id="cancel_cast_member_btn")
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "save_cast_member_btn":
+            self.action_save()
+        elif event.button.id == "cancel_cast_member_btn":
+            self.action_cancel()
+
+    def action_save(self) -> None:
+        name = self.query_one("#member_name", Input).value.strip()
+        age = self.query_one("#member_age", Input).value.strip()
+        gender = self.query_one("#member_gender", Input).value.strip()
+        ethnicity = self.query_one("#member_ethnicity", Input).value.strip()
+        hair = self.query_one("#member_hair", Input).value.strip()
+        build = self.query_one("#member_build", Input).value.strip()
+        anchor = self.query_one("#member_anchor", Input).value.strip()
+
+        if not name:
+            self.notify("Please enter an actor or character name.", severity="warning")
+            return
+
+        parts = [p for p in [ethnicity, hair, build] if p]
+        phys = ", ".join(parts) if parts else "Unspecified"
+
+        cast_dict = {
+            "name": name,
+            "age_range": age or "Unspecified",
+            "gender": gender or "Unspecified",
+            "ethnicity": ethnicity or "Unspecified",
+            "hair": hair or "Unspecified",
+            "build": build or "Unspecified",
+            "visual_anchor": anchor or "None",
+            "physicality": phys,
+        }
+        self.dismiss(cast_dict)
+
+
 class ProfileSetupScreen(ModalScreen[Optional[TeamProfile]]):
     """Interactive Modal Screen for setup or editing of Team Profile with Crew & Cast Roster Builders."""
 
@@ -363,7 +515,7 @@ class ProfileSetupScreen(ModalScreen[Optional[TeamProfile]]):
         margin-bottom: 0;
     }
 
-    #roster-input-bar, #cast-input-bar-1, #cast-input-bar-2 {
+    #roster-input-bar {
         height: 3;
         margin-bottom: 1;
         layout: horizontal;
@@ -383,25 +535,6 @@ class ProfileSetupScreen(ModalScreen[Optional[TeamProfile]]):
         width: 23%;
     }
 
-    #cast_name, #cast_age {
-        width: 49%;
-        margin-right: 1;
-    }
-
-    #cast_gender {
-        width: 32%;
-        margin-right: 1;
-    }
-
-    #cast_physicality {
-        width: 42%;
-        margin-right: 1;
-    }
-
-    #add_cast_btn {
-        width: 23%;
-    }
-
     #roster_table, #cast_table {
         height: 6;
         margin-bottom: 1;
@@ -412,6 +545,10 @@ class ProfileSetupScreen(ModalScreen[Optional[TeamProfile]]):
         height: 3;
         margin-bottom: 1;
         align: right middle;
+    }
+
+    #cast-action-bar Button {
+        margin-left: 1;
     }
 
     #available_gear {
@@ -487,18 +624,12 @@ class ProfileSetupScreen(ModalScreen[Optional[TeamProfile]]):
                 with Horizontal(id="roster-action-bar"):
                     yield Button("Remove Selected Crew", variant="error", id="remove_member_btn")
 
-                yield Label("🎭 Cast Roster Builder (Name, Age, Gender, Physicality):", classes="field-label")
-                with Horizontal(id="cast-input-bar-1"):
-                    yield Input(placeholder="Actor / Character Name", id="cast_name")
-                    yield Input(placeholder="Age Range (e.g. 20s-30s)", id="cast_age")
-                with Horizontal(id="cast-input-bar-2"):
-                    yield Input(placeholder="Gender (e.g. Female)", id="cast_gender")
-                    yield Input(placeholder="Physicality / Appearance", id="cast_physicality")
-                    yield Button("Add Cast", variant="primary", id="add_cast_btn")
+                yield Label("🎭 Cast Roster Builder (Visual Profiles & Anchors):", classes="field-label")
+                with Horizontal(id="cast-action-bar"):
+                    yield Button("➕ Add Cast Member", variant="primary", id="btn_add_cast")
+                    yield Button("Remove Selected Cast", variant="error", id="remove_cast_btn")
 
                 yield DataTable(id="cast_table", cursor_type="row")
-                with Horizontal(id="cast-action-bar"):
-                    yield Button("Remove Selected Cast", variant="error", id="remove_cast_btn")
 
                 yield Label("🛠️ Available Gear & Equipment Catalog (one per line):", classes="field-label")
                 gear_text = "\n".join(self.current_profile.available_gear) if self.current_profile and self.current_profile.available_gear else ""
@@ -514,7 +645,15 @@ class ProfileSetupScreen(ModalScreen[Optional[TeamProfile]]):
         self.refresh_roster_table()
 
         cast_table = self.query_one("#cast_table", DataTable)
-        cast_table.add_columns("Name", "Age Range", "Gender", "Physicality")
+        cast_table.add_columns(
+            "Name",
+            "Age Range",
+            "Gender",
+            "Ethnicity",
+            "Hair",
+            "Build",
+            "Visual Anchor",
+        )
         self.refresh_cast_table()
 
     def refresh_roster_table(self) -> None:
@@ -530,9 +669,12 @@ class ProfileSetupScreen(ModalScreen[Optional[TeamProfile]]):
         for item in self.cast:
             table.add_row(
                 item.get("name", ""),
-                item.get("age_range", ""),
-                item.get("gender", ""),
-                item.get("physicality", ""),
+                item.get("age_range", "Unspecified"),
+                item.get("gender", "Unspecified"),
+                item.get("ethnicity", "Unspecified"),
+                item.get("hair", "Unspecified"),
+                item.get("build", "Unspecified"),
+                item.get("visual_anchor", "None"),
             )
 
     def action_cancel(self) -> None:
@@ -547,7 +689,7 @@ class ProfileSetupScreen(ModalScreen[Optional[TeamProfile]]):
             self.action_add_member()
         elif event.button.id == "remove_member_btn":
             self.action_remove_selected_member()
-        elif event.button.id == "add_cast_btn":
+        elif event.button.id in ("btn_add_cast", "add_cast_btn"):
             self.action_add_cast_member()
         elif event.button.id == "remove_cast_btn":
             self.action_remove_selected_cast_member()
@@ -599,28 +741,13 @@ class ProfileSetupScreen(ModalScreen[Optional[TeamProfile]]):
             self.notify(f"Could not remove selected member: {err}", severity="error")
 
     def action_add_cast_member(self) -> None:
-        name = self.query_one("#cast_name", Input).value.strip()
-        age_range = self.query_one("#cast_age", Input).value.strip()
-        gender = self.query_one("#cast_gender", Input).value.strip()
-        physicality = self.query_one("#cast_physicality", Input).value.strip()
+        def _on_member_saved(result: Optional[Dict[str, str]]) -> None:
+            if result:
+                self.cast.append(result)
+                self.refresh_cast_table()
+                self.notify(f"Added cast member '{result.get('name')}'.", severity="information")
 
-        if not name:
-            self.notify("Please enter actor/character name.", severity="warning")
-            return
-
-        self.cast.append({
-            "name": name,
-            "age_range": age_range or "Unspecified",
-            "gender": gender or "Unspecified",
-            "physicality": physicality or "Unspecified",
-        })
-
-        self.query_one("#cast_name", Input).value = ""
-        self.query_one("#cast_age", Input).value = ""
-        self.query_one("#cast_gender", Input).value = ""
-        self.query_one("#cast_physicality", Input).value = ""
-        self.refresh_cast_table()
-        self.notify(f"Added cast member '{name}'.", severity="information")
+        self.app.push_screen(CastMemberScreen(), _on_member_saved)
 
     def action_remove_selected_cast_member(self) -> None:
         table = self.query_one("#cast_table", DataTable)
@@ -675,3 +802,4 @@ class ProfileSetupScreen(ModalScreen[Optional[TeamProfile]]):
 
         save_profile(profile)
         self.dismiss(profile)
+

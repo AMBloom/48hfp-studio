@@ -225,6 +225,8 @@ class PromptBuilder:
             "CRITICAL OUTPUT MANDATE:\n"
             "• Output ONLY the pure raw .fountain screenplay text.\n"
             "• DO NOT wrap your response in markdown code fences (no ```fountain or ```).\n"
+            "• DO NOT write Title, Author, or Draft date title page metadata headers (the application automatically prepends standard Fountain metadata).\n"
+            "• Begin your response directly with the first scene heading (e.g. INT. LOCATION - DAY).\n"
             "• DO NOT include introductory greetings, system prompt appendices, or trailing commentary."
         )
 
@@ -389,12 +391,30 @@ class PromptBuilder:
             lines.append("  • No specific crew role assignments provided.")
 
         if profile.cast:
-            lines.append("Available Cast Roster:")
+            lines.append("Available Cast Roster & Visual Profiles:")
             for actor in profile.cast:
-                lines.append(
-                    f"  • {actor.get('name', 'Actor')}: Age {actor.get('age_range', 'N/A')}, "
-                    f"Gender: {actor.get('gender', 'N/A')}, Physicality: {actor.get('physicality', 'N/A')}"
-                )
+                name = actor.get("name", "Actor")
+                age = actor.get("age_range", "N/A")
+                gender = actor.get("gender", "N/A")
+                ethnicity = actor.get("ethnicity", "Unspecified")
+                hair = actor.get("hair", "Unspecified")
+                build = actor.get("build", "Unspecified")
+                anchor = actor.get("visual_anchor", "None")
+                phys = actor.get("physicality", "N/A")
+
+                details = [f"Age: {age}", f"Gender: {gender}"]
+                if ethnicity != "Unspecified":
+                    details.append(f"Ethnicity: {ethnicity}")
+                if hair != "Unspecified":
+                    details.append(f"Hair: {hair}")
+                if build != "Unspecified":
+                    details.append(f"Build: {build}")
+                if anchor != "None":
+                    details.append(f"Signature Visual Anchor: {anchor}")
+                if phys != "N/A" and phys != "Unspecified" and ethnicity == "Unspecified":
+                    details.append(f"Physicality: {phys}")
+
+                lines.append(f"  • {name}: {', '.join(details)}")
 
         if profile.available_gear:
             lines.append("Available Equipment & Gear Catalog:")
@@ -463,6 +483,10 @@ class PromptBuilder:
             f"Complications & Midpoint Twists:\n  {idea.complications or 'N/A'}",
             f"Ending Targets & Resolution Notes:\n  {idea.ending_targets or 'N/A'}",
         ]
+        if idea.max_actors is not None:
+            lines.append(
+                f"Maximum Recommended Actors / Cast Size: {idea.max_actors} (Constraint: Keep character count tight and centered around at most {idea.max_actors} key actors)."
+            )
         return header + "\n".join(lines)
 
     @staticmethod
@@ -520,6 +544,7 @@ class PromptBuilder:
             "   - 1-2 sentence dramatic Logline\n\n"
             "2. ## CHARACTER ROSTER & CASTING\n"
             "   - Detailed breakdown of all characters, matching available team cast.\n"
+            "   - For EACH character, provide a complete Visual Profile (ethnicity, hair color/style, build/silhouette, and signature visual anchor/wardrobe piece).\n"
             "   - Explicitly highlight the Required Character entity.\n\n"
             "3. ## NARRATIVE SYNOPSIS & THEMATIC ARC\n"
             "   - 3-paragraph story summary (Act I Setup, Act II Escalation, Act III Climax/Resolution).\n"
@@ -531,6 +556,7 @@ class PromptBuilder:
             "6. ## FESTIVAL COMPLIANCE CHECKLIST\n"
             "   - Explicit verification list confirming verbatim line, prop usage, character linkage, and runtime pacing."
         )
+
 
     @staticmethod
     def _build_draw_section(draw: Optional[FridayDraw]) -> str:

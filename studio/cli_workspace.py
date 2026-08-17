@@ -55,6 +55,7 @@ def init_workspace(
     (target_path / "constraints" / "directorial").mkdir(parents=True, exist_ok=True)
     (target_path / "constraints" / "thematic").mkdir(parents=True, exist_ok=True)
     (target_path / "constraints" / "ideas").mkdir(parents=True, exist_ok=True)
+    (target_path / "projects").mkdir(parents=True, exist_ok=True)
     (target_path / "outputs").mkdir(parents=True, exist_ok=True)
 
     # Set active workspace in global state tracker

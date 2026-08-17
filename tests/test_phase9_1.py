@@ -179,10 +179,9 @@ async def test_action_revise_treatment_flow(tmp_path: Path, dummy_treatment) -> 
             assert app.current_treatment_obj.title_and_logline.title == "Night Call Dark Edition"
             assert notes_input.text == ""  # Input cleared after submission
 
-            # Verify saved version output file created in workspace outputs/
-            outputs_dir = ws_dir / "outputs"
-            assert outputs_dir.exists()
-            output_files = list(outputs_dir.glob("treatment_v*.md"))
+            # Verify saved version output file created in workspace projects/Night_Call_Dark_Edition/
+            proj_dir = ws_dir / "projects" / "Night_Call_Dark_Edition"
+            assert proj_dir.exists()
+            output_files = list(proj_dir.glob("treatment_v*.md"))
             assert len(output_files) == 1
-            assert "treatment_v01_" in output_files[0].name
-            assert "Night_Call_Dark_Edition" in output_files[0].name
+            assert output_files[0].name == "treatment_v01.md"

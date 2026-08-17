@@ -27,22 +27,30 @@ def sanitize_filename_part(text: str) -> str:
 
 
 def get_next_version_number(outputs_dir: Path) -> int:
-    """Scan outputs directory for existing treatments and compute next version number.
+    """Scan directory for existing treatments and compute next version number.
 
-    Guardrail 3 (Empty Directory Fallback): Defaults safely to 1 if no treatment
-    files exist or if directory is empty.
+    Supports encapsulated format (treatment_v01.md) and legacy format (treatment_v01_...md).
+    Defaults safely to 1 if no treatment files exist or if directory is empty.
     """
     if not outputs_dir.exists():
         return 1
 
-    pattern = re.compile(r"^treatment_v(\d+)_", re.IGNORECASE)
+    encapsulated_pattern = re.compile(r"^treatment_v(\d+)\.md$", re.IGNORECASE)
+    legacy_pattern = re.compile(r"^treatment_v(\d+)_", re.IGNORECASE)
     versions: List[int] = []
 
     for file_path in outputs_dir.glob("treatment_v*.md"):
-        match = pattern.match(file_path.name)
-        if match:
+        enc_match = encapsulated_pattern.match(file_path.name)
+        if enc_match:
             try:
-                versions.append(int(match.group(1)))
+                versions.append(int(enc_match.group(1)))
+                continue
+            except ValueError:
+                pass
+        leg_match = legacy_pattern.match(file_path.name)
+        if leg_match:
+            try:
+                versions.append(int(leg_match.group(1)))
             except ValueError:
                 continue
 
@@ -166,34 +174,14 @@ def save_treatment_output(
     treatment: TreatmentOutput,
     outputs_dir: Optional[Path] = None,
     prompt_text: Optional[str] = None,
+    project_dir: Optional[Path] = None,
 ) -> Path:
     """Safely export treatment to Markdown file with auto-incrementing zero-padded version.
 
-    Guardrail 1 (Cross-Platform Pathing): Defaults to `pathlib.Path.cwd() / "outputs"`.
-    Guardrail 2 (Version Zero-Padding): Formats version as v01, v02, v10, etc.
+    Default target: `<workspace_root>/projects/<Clean_Project_Title>/treatment_v01.md`.
+    If `outputs_dir` is explicitly supplied, preserves flat output for backward compatibility.
     Safe-Write System: Ensures previous outputs are NEVER overwritten.
     """
-    # Guardrail 1: Cross-Platform Pathing using active workspace or Path.cwd()
-    target_dir = outputs_dir or (get_workspace_root() / "outputs")
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    # Resolve active constraints for naming
-    profile = load_profile()
-    log_name = "Unconstrained"
-    dir_name = "Unconstrained"
-    them_name = "Unconstrained"
-    idea_name = "Unconstrained"
-
-    if profile:
-        if profile.active_logistical_constraint:
-            log_name = profile.active_logistical_constraint
-        if profile.active_directorial_vision:
-            dir_name = profile.active_directorial_vision
-        if profile.active_thematic_framework:
-            them_name = profile.active_thematic_framework
-        if profile.active_idea_seed:
-            idea_name = profile.active_idea_seed
-
     raw_title = (
         treatment.title_and_logline.title
         if (treatment and treatment.title_and_logline and treatment.title_and_logline.title)
@@ -201,25 +189,54 @@ def save_treatment_output(
     )
     title_clean = sanitize_filename_part(raw_title)
 
-    log_clean = sanitize_filename_part(log_name)
-    dir_clean = sanitize_filename_part(dir_name)
-    them_clean = sanitize_filename_part(them_name)
-    idea_clean = sanitize_filename_part(idea_name)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if outputs_dir is not None:
+        target_dir = outputs_dir
+        target_dir.mkdir(parents=True, exist_ok=True)
 
-    # Guardrail 3 & 2: Calculate version and format with zero-padding
-    version = get_next_version_number(target_dir)
+        profile = load_profile()
+        log_name = "Unconstrained"
+        dir_name = "Unconstrained"
+        them_name = "Unconstrained"
+        idea_name = "Unconstrained"
 
-    # Loop to guarantee safe-write non-overwrite protection
-    while True:
-        # Guardrail 2: Zero-padded 2-digit integer e.g., v01, v02
-        version_str = f"v{version:02d}"
-        filename = f"treatment_{version_str}_{title_clean}_{log_clean}_{dir_clean}_{them_clean}_{idea_clean}_{timestamp}.md"
-        file_path = target_dir / filename
+        if profile:
+            if profile.active_logistical_constraint:
+                log_name = profile.active_logistical_constraint
+            if profile.active_directorial_vision:
+                dir_name = profile.active_directorial_vision
+            if profile.active_thematic_framework:
+                them_name = profile.active_thematic_framework
+            if profile.active_idea_seed:
+                idea_name = profile.active_idea_seed
 
-        if not file_path.exists():
-            break
-        version += 1
+        log_clean = sanitize_filename_part(log_name)
+        dir_clean = sanitize_filename_part(dir_name)
+        them_clean = sanitize_filename_part(them_name)
+        idea_clean = sanitize_filename_part(idea_name)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        version = get_next_version_number(target_dir)
+
+        while True:
+            version_str = f"v{version:02d}"
+            filename = f"treatment_{version_str}_{title_clean}_{log_clean}_{dir_clean}_{them_clean}_{idea_clean}_{timestamp}.md"
+            file_path = target_dir / filename
+            if not file_path.exists():
+                break
+            version += 1
+    else:
+        target_dir = project_dir or (get_workspace_root() / "projects" / title_clean)
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        version = get_next_version_number(target_dir)
+
+        while True:
+            version_str = f"v{version:02d}"
+            filename = f"treatment_{version_str}.md"
+            file_path = target_dir / filename
+            if not file_path.exists():
+                break
+            version += 1
 
     markdown_content = convert_treatment_to_markdown(treatment, prompt_text=prompt_text)
     file_path.write_text(markdown_content, encoding="utf-8")

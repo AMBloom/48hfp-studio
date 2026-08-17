@@ -38,6 +38,10 @@ def test_workspace_sidebar_button_order() -> None:
     button_ids = [b.id for b in buttons if isinstance(b, Button)]
 
     expected_ids = [
+        "btn_nav_treatment",
+        "btn_nav_screenplay",
+        "btn_nav_shotlist",
+        "btn_nav_storyboards",
         "btn_profile_modal",
         "btn_workspace_modal",
         "btn_load_drafts",

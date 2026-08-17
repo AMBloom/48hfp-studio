@@ -3,7 +3,7 @@
 Represents the complete pre-production film treatment layout required for 48HFP.
 """
 
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -19,6 +19,27 @@ class TitleAndLogline(BaseModel):
     )
 
 
+class VisualProfile(BaseModel):
+    """Visual and physical identifiers locked down during character generation."""
+
+    ethnicity: str = Field(
+        default="Unspecified",
+        description="Perceived ethnicity, complexion, or cultural heritage traits",
+    )
+    hair: str = Field(
+        default="Unspecified",
+        description="Hair color, texture, length, and style",
+    )
+    build: str = Field(
+        default="Unspecified",
+        description="Physical build, silhouette, height, and posture",
+    )
+    visual_anchor: str = Field(
+        default="None",
+        description="Signature costume piece, distinctive accessory, or prominent physical feature",
+    )
+
+
 class CharacterRosterItem(BaseModel):
     """Detailed character specification for cast allocation."""
 
@@ -31,6 +52,11 @@ class CharacterRosterItem(BaseModel):
         default=False,
         description="True if this character satisfies the 48HFP required character constraint",
     )
+    visual_profile: Optional[VisualProfile] = Field(
+        default_factory=VisualProfile,
+        description="Explicit visual identifiers for character appearance consistency across pipeline",
+    )
+
 
 
 class NarrativeSynopsis(BaseModel):
